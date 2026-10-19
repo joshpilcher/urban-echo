@@ -20,7 +20,9 @@ async function check(name, fn) {
   console.log("PASS " + name);
 }
 async function main() {
-  await fs.mkdir(path.join(root, "test-results/screenshots"), {recursive:true});
+  await fs.mkdir(path.join(root, "test-results/screenshots"), {
+    recursive: true,
+  });
   const server = http.createServer(async (req, res) => {
     try {
       let file = path.join(
@@ -62,10 +64,20 @@ async function main() {
     const offline = process.env.ECHO_TEST_OFFLINE === "1";
     const newContext = async (options) => {
       const context = await browser.newContext(options);
-      if (offline) await context.route("https://**", route => route.abort());
+      // Regression checks stay device-only even when the app has live configuration.
+      await context.route("**/config.js", (route) =>
+        route.fulfill({
+          contentType: "text/javascript",
+          body: "window.URBAN_ECHO_CONFIG = {};",
+        }),
+      );
+      if (offline) await context.route("https://**", (route) => route.abort());
       return context;
     };
-    if (offline) console.log("Offline check: external map tiles/fonts blocked; testing local GPS/list workflow.");
+    if (offline)
+      console.log(
+        "Offline check: external map tiles/fonts blocked; testing local GPS/list workflow.",
+      );
     const context = await newContext({
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 1,
@@ -76,7 +88,13 @@ async function main() {
     });
     // Optional web fonts must not turn a functional test into a network timeout.
     // The product's normal CSS system-font fallback is used in these captures.
-    await context.route("https://fonts.googleapis.com/**", route => route.fulfill({status:200,contentType:"text/css",body:"/* system fonts for repeatable browser checks */"}));
+    await context.route("https://fonts.googleapis.com/**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/css",
+        body: "/* system fonts for repeatable browser checks */",
+      }),
+    );
     const page = await context.newPage();
     page.setDefaultTimeout(10000);
     page.setDefaultNavigationTimeout(20000);
@@ -122,6 +140,7 @@ async function main() {
       await page.locator("#title").fill(title);
       await page.locator("#story").fill(story);
       await page.locator("#echo-form button[type=submit]").click();
+      await page.locator("#dialog").waitFor({ state: "hidden" });
     };
     await check("no implicit GPS prompt and empty browser state", async () => {
       assert.equal(await page.evaluate(() => __gps.started), 0);
@@ -194,7 +213,7 @@ async function main() {
         await page.locator("#filter-unlocked").click();
         await emit({ ...point, latitude: point.latitude + 0.002 });
         assert.equal(await page.locator(".echo").count(), 0);
-        assert.match(await text("#echo-list"), /Nothing within reach/);
+        assert.match(await text("#echo-list"), /No memories in this view/);
         await page.locator("#filter-all").click();
         await emit(point);
       },
@@ -223,6 +242,7 @@ async function main() {
         await emit({ ...point, longitude: point.longitude + 0.001 });
         await page.locator("#create").click();
         await page.locator("#echo-form button[type=submit]").click();
+        await page.locator("#dialog").waitFor({ state: "hidden" });
         assert.equal(
           await page.evaluate(
             () => JSON.parse(localStorage.getItem("urban-echo-v1"))[0].lng,
@@ -260,6 +280,7 @@ async function main() {
         assert.equal(await page.locator(".leaflet-tooltip img").count(), 0);
         assert.equal(await page.evaluate(() => window.injected), undefined);
         assert.match(await text(".leaflet-tooltip"), /<img/);
+        await page.locator("#detail-close").click();
       },
     );
     await check(
@@ -286,6 +307,152 @@ async function main() {
           Storage.prototype.setItem = window.__setItem;
         });
         await page.locator("#close").click();
+      },
+    );
+    await check(
+      "photo validation rejects unsupported and unreadable files without losing the draft",
+      async () => {
+        await emit(point);
+        await page.locator("#create").click();
+        await page.locator("#title").fill("Photo validation draft");
+        await page.locator("#story").fill("Keep this text when a photo fails.");
+        await page.locator("#photo").setInputFiles({
+          name: "invalid.gif",
+          mimeType: "image/gif",
+          buffer: Buffer.from("bad"),
+        });
+        await page.waitForFunction(() =>
+          document.querySelector("#photo-status").textContent.includes("JPEG"),
+        );
+        assert.equal(
+          await page.locator("#story").inputValue(),
+          "Keep this text when a photo fails.",
+        );
+        await page.locator("#photo").setInputFiles({
+          name: "broken.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from("not an image"),
+        });
+        await page.waitForFunction(() =>
+          document
+            .querySelector("#photo-status")
+            .textContent.includes("could not be opened"),
+        );
+        assert.equal(
+          await page.locator("#visibility-public").isDisabled(),
+          true,
+        );
+        await page.locator("#close").click();
+      },
+    );
+    await check(
+      "photo is resized and re-encoded, persists separately from text, and relocks in open detail",
+      async () => {
+        const png = await page.evaluate(() => {
+          const c = document.createElement("canvas");
+          c.width = 2000;
+          c.height = 1000;
+          const x = c.getContext("2d");
+          x.fillStyle = "#087d81";
+          x.fillRect(0, 0, 2000, 1000);
+          x.fillStyle = "#fff";
+          x.font = "72px sans-serif";
+          x.fillText("SYNTHETIC PHOTO TEST", 100, 500);
+          return c.toDataURL("image/png").split(",")[1];
+        });
+        await page.locator("#create").click();
+        await page.locator("#title").fill("Synthetic photo memory");
+        await page
+          .locator("#story")
+          .fill("A generated test image, never a field-test photograph.");
+        await page.locator("#photo").setInputFiles({
+          name: "fixture.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(png, "base64"),
+        });
+        await page.locator("#photo-preview").waitFor({ state: "visible" });
+        await page.locator("#dialog").evaluate((dialog) => {
+          const p = document.createElement("p");
+          p.id = "photo-test-label";
+          p.textContent = "SIMULATED GPS · SYNTHETIC PHOTO TEST";
+          p.style = "color:#975d20;font:700 10px system-ui";
+          dialog.prepend(p);
+        });
+        await page.locator("#photo-preview").scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: path.join(
+            root,
+            "test-results/screenshots/iteration-03-photo-create.png",
+          ),
+        });
+        await page.locator("#photo-test-label").evaluate((el) => el.remove());
+        await page.locator("#save-echo").click();
+        await page.locator("#dialog").waitFor({ state: "hidden" });
+        const stored = await page.evaluate(async () => {
+          const record = JSON.parse(localStorage.getItem("urban-echo-v1"))[0];
+          const blob = await EchoMedia.get(record.photoId);
+          const bitmap = await createImageBitmap(blob);
+          return {
+            record,
+            type: blob.type,
+            size: blob.size,
+            width: bitmap.width,
+            height: bitmap.height,
+          };
+        });
+        assert.equal(stored.type, "image/jpeg");
+        assert.equal(stored.width, 1600);
+        assert.equal(stored.height, 800);
+        assert.ok(stored.size <= 1500 * 1024);
+        assert.ok(stored.record.photoId);
+        assert.ok(!JSON.stringify(stored.record).includes("base64"));
+        await page.reload({ waitUntil: "domcontentloaded" });
+        assert.equal(await page.locator(".echo img").count(), 0);
+        await page.locator("#locate").click();
+        await emit(point);
+        const card = page
+          .locator(".echo")
+          .filter({ hasText: "Synthetic photo memory" });
+        await card.locator("img").waitFor();
+        await card.click();
+        assert.equal(await page.locator("#detail-image img").count(), 1);
+        await page.locator("#detail-dialog").evaluate((dialog) => {
+          const p = document.createElement("p");
+          p.id = "photo-test-label";
+          p.textContent = "SIMULATED GPS · SYNTHETIC PHOTO TEST";
+          p.style =
+            "color:#975d20;font:700 10px system-ui;padding:12px;margin:0";
+          dialog.prepend(p);
+        });
+        await page.screenshot({
+          path: path.join(
+            root,
+            "test-results/screenshots/iteration-03-photo-detail.png",
+          ),
+        });
+        await page.locator("#photo-test-label").evaluate((el) => el.remove());
+        await emit({ ...point, latitude: point.latitude + 0.002 });
+        assert.equal(await page.locator("#detail-image img").count(), 0);
+        assert.doesNotMatch(
+          await text("#detail-story"),
+          /generated test image/,
+        );
+        await emit(point);
+        await page.locator("#detail-image img").waitFor();
+        await page.locator("#delete-echo").click();
+        await page.locator("#delete-yes").click();
+        await page.locator("#detail-dialog").waitFor({ state: "hidden" });
+        await page.waitForFunction(
+          (id) => EchoMedia.get(id).then((blob) => !blob),
+          stored.record.photoId,
+        );
+        assert.equal(
+          await page
+            .locator(".echo")
+            .filter({ hasText: "Synthetic photo memory" })
+            .count(),
+          0,
+        );
       },
     );
     await check(
@@ -376,13 +543,29 @@ async function main() {
       document.body.append(b);
     });
     await page.evaluate(() => window.scrollTo(0, 0));
-    if (!offline) await page.waitForFunction(() => {
-      const tiles = [...document.querySelectorAll(".leaflet-tile")];
-      return tiles.length > 0 && tiles.every(tile => tile.complete && tile.naturalWidth > 0);
-    }, null, {timeout:12000}).then(() => console.log("CAPTURE: basemap loaded"), () => console.log("CAPTURE: basemap pending or unavailable; GPS/list capture continues"));
+    if (!offline)
+      await page
+        .waitForFunction(
+          () => {
+            const tiles = [...document.querySelectorAll(".leaflet-tile")];
+            return (
+              tiles.length > 0 &&
+              tiles.every((tile) => tile.complete && tile.naturalWidth > 0)
+            );
+          },
+          null,
+          { timeout: 12000 },
+        )
+        .then(
+          () => console.log("CAPTURE: basemap loaded"),
+          () =>
+            console.log(
+              "CAPTURE: basemap pending or unavailable; GPS/list capture continues",
+            ),
+        );
     await emit(point);
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-02-mobile.png"),
+      path: path.join(root, "test-results/screenshots/iteration-03-mobile.png"),
       fullPage: true,
     });
     await page.locator("#create").click();
@@ -398,7 +581,7 @@ async function main() {
       dialog.prepend(note);
     });
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-02-create.png"),
+      path: path.join(root, "test-results/screenshots/iteration-03-create.png"),
       fullPage: false,
     });
     await page.locator("#dialog-test-banner").evaluate((el) => el.remove());
@@ -406,13 +589,32 @@ async function main() {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await emit({ ...point, latitude: point.latitude + 0.002 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    if (!offline) await page.waitForFunction(() => {
-      const tiles = [...document.querySelectorAll(".leaflet-tile")];
-      return tiles.length > 0 && tiles.every(tile => tile.complete && tile.naturalWidth > 0);
-    }, null, {timeout:12000}).then(() => console.log("CAPTURE: basemap loaded"), () => console.log("CAPTURE: basemap pending or unavailable; GPS/list capture continues"));
+    if (!offline)
+      await page
+        .waitForFunction(
+          () => {
+            const tiles = [...document.querySelectorAll(".leaflet-tile")];
+            return (
+              tiles.length > 0 &&
+              tiles.every((tile) => tile.complete && tile.naturalWidth > 0)
+            );
+          },
+          null,
+          { timeout: 12000 },
+        )
+        .then(
+          () => console.log("CAPTURE: basemap loaded"),
+          () =>
+            console.log(
+              "CAPTURE: basemap pending or unavailable; GPS/list capture continues",
+            ),
+        );
     await emit({ ...point, latitude: point.latitude + 0.002 });
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-02-desktop.png"),
+      path: path.join(
+        root,
+        "test-results/screenshots/iteration-03-desktop.png",
+      ),
       fullPage: true,
     });
     await check(

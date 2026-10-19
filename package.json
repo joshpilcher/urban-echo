@@ -1,0 +1,12 @@
+{
+  "name": "urban-echo",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "test": "node --test tests/core.test.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

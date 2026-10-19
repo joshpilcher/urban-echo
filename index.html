@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#101b23" />
+    <meta
+      name="description"
+      content="Urban Echo — discover memories connected to real places"
+    />
+    <title>Urban Echo — Discover the stories around you</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="vendor/leaflet/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#discovery">Skip to Echoes</a>
+    <div class="app">
+      <header class="topbar">
+        <div class="identity">
+          <span class="logo" aria-hidden="true">◎</span>
+          <div>
+            <strong>URBAN ECHO</strong><small>Every place has a story.</small>
+          </div>
+        </div>
+        <span class="prototype">PROTOTYPE · V0.2</span>
+      </header>
+      <main class="layout">
+        <section class="map-panel" aria-label="Interactive Echo map">
+          <div id="map" aria-label="Map showing your location and Echoes"></div>
+          <div class="map-overlay">
+            <div class="eyebrow">EXPLORE YOUR WORLD</div>
+            <h1>Places hold<br /><em>memories.</em></h1>
+            <p>Be here. Discover what happened here.</p>
+          </div>
+          <p class="map-notice" id="map-notice" role="status" hidden></p>
+          <button
+            class="recenter"
+            id="recenter"
+            title="Centre map on my position"
+            aria-label="Centre map on my position"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+            >
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
+              <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+            </svg>
+          </button>
+          <div class="map-legend">
+            <span class="legend-user">● You</span><span>● Echo</span
+            ><span>100 m to discover</span>
+          </div>
+        </section>
+        <aside class="sidebar" id="discovery" tabindex="-1">
+          <section aria-label="Location controls">
+            <div class="status">
+              <span class="status-dot" id="status-dot"></span>
+              <div role="status">
+                <strong id="location-status">Find your place</strong
+                ><small id="location-subtitle"
+                  >Enable location to discover memories nearby.</small
+                >
+              </div>
+              <button id="locate" class="secondary">Enable GPS</button>
+            </div>
+            <div class="tracking-controls">
+              <small id="fix-age"
+                >Location is only used while tracking is on.</small
+              ><button id="stop" class="text-button" hidden>
+                Stop tracking
+              </button>
+            </div>
+          </section>
+          <div class="discovery-heading">
+            <div class="side-head">
+              <div>
+                <span class="eyebrow">DISCOVER</span>
+                <h2>Echoes around you</h2>
+              </div>
+              <span
+                id="echo-count"
+                class="count"
+                aria-label="Total saved Echoes"
+                >0</span
+              >
+            </div>
+            <p id="discovery-summary" class="muted">
+              Memories reveal themselves within 100 metres.
+            </p>
+          </div>
+          <div class="filters" role="group" aria-label="Filter Echoes">
+            <button id="filter-all" aria-pressed="true">All Echoes</button
+            ><button id="filter-unlocked" aria-pressed="false">
+              Within reach <span id="unlocked-count">0</span>
+            </button>
+          </div>
+          <p class="storage-note" id="storage-note">
+            Saved on this device only · no shared memories yet
+          </p>
+          <div id="echo-list" class="echo-list"></div>
+          <p id="announcement" class="sr-only" role="status"></p>
+          <div class="bottom">
+            <p id="create-hint">Enable GPS to leave a memory where you are.</p>
+            <button id="create" class="primary" disabled>+ Leave an Echo</button
+            ><a href="https://github.com/joshpilcher/urban-echo-process-journal">↗ View process journal</a>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <dialog id="dialog" aria-labelledby="dialog-title">
+      <form id="echo-form">
+        <div class="dialog-head">
+          <div>
+            <span class="eyebrow">ADD TO THE MAP</span>
+            <h2 id="dialog-title">Leave an Echo</h2>
+          </div>
+          <button type="button" id="close" class="close" aria-label="Close">
+            ×
+          </button>
+        </div>
+        <p>
+          A memory for the place where you’re standing. Saved privately in this
+          browser, along with precise coordinates. It will not appear on other
+          devices.
+        </p>
+        <p class="location-preview" id="save-location" role="status"></p>
+        <label for="title"
+          >Memory title <small>Up to 65 characters</small></label
+        >
+        <input
+          id="title"
+          name="title"
+          maxlength="65"
+          required
+          placeholder="A moment worth remembering"
+        />
+        <label for="story"
+          >Your story <small>Up to 1,200 characters</small></label
+        >
+        <textarea
+          id="story"
+          name="story"
+          maxlength="1200"
+          rows="5"
+          required
+          placeholder="What happened here?"
+        ></textarea>
+        <p class="validation" id="form-error" role="alert"></p>
+        <button class="primary" type="submit">Save my Echo</button>
+      </form>
+    </dialog>
+    <noscript
+      ><p class="empty">
+        Urban Echo needs JavaScript for the map, GPS and memory creation.
+      </p></noscript
+    >
+    <script
+      src="vendor/leaflet/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="core.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

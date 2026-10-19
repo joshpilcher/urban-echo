@@ -1,5 +1,7 @@
 # Urban Echo
 
+**[Open the live prototype](https://joshpilcher.github.io/urban-echo/)** · [Process journal](https://joshpilcher.github.io/urban-echo-process-journal/)
+
 Location-responsive mobile web app · DES222 prototype v0.2
 
 A location-responsive DES222 mobile web prototype. The map and distance-sorted memory cards respond to device location; stories reveal when the reported position and its accuracy estimate fit inside a 100 m discovery radius.

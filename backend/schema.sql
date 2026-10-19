@@ -13,9 +13,9 @@ create table if not exists public.urban_echoes (
 create index if not exists urban_echoes_created_at_idx on public.urban_echoes (created_at desc);
 create index if not exists urban_echoes_owner_id_idx on public.urban_echoes (owner_id);
 alter table public.urban_echoes enable row level security;
+revoke all privileges on public.urban_echoes from anon, authenticated;
 grant select on public.urban_echoes to anon, authenticated;
 grant insert, delete on public.urban_echoes to authenticated;
-revoke update on public.urban_echoes from anon, authenticated;
 create policy "Urban Echo public read" on public.urban_echoes for select to anon, authenticated using (true);
 create policy "Urban Echo owner create" on public.urban_echoes for insert to authenticated with check ((select auth.uid()) = owner_id);
 create policy "Urban Echo owner delete" on public.urban_echoes for delete to authenticated using ((select auth.uid()) = owner_id);

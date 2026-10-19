@@ -1,9 +1,9 @@
-# Shared Echo setup — pending live connection
+# Shared Echo setup — project provisioned, contributor testing pending
 
-The app works with device-only photos without this backend. Public is disabled while `config.js` has empty values. No database migration or real cloud upload has been performed for this iteration.
+The app works with device-only photos without this backend. Public is disabled while `config.js` has empty values. The dedicated Sydney project `jamgivrngcderqmemjmb` now has the table, public photo bucket and ownership policies. A public REST read returned HTTP 200 with an empty result. Supabase security advisors reported no findings after the grants were restricted. No real photo upload or cross-user test has been completed. Dashboard sign-in is awaiting a user-completed CAPTCHA before anonymous sign-ins can be configured.
 
-1. Choose a dedicated Supabase project for Urban Echo. Do not use a paid project or unrelated application's database by accident.
-2. Apply `schema.sql` once as a migration. It creates the public Echo table, owner policies and a public JPEG photo bucket with a 1.5 MB object limit.
+1. The dedicated Urban Echo project is in the student organisation, in `ap-southeast-2`. The existing BikePark project was not changed.
+2. Applied migrations: `urban_echo_public_memories` and `urban_echo_least_privilege_grants`. `schema.sql` is the consolidated setup. The second migration revokes inherited broad grants before granting only public SELECT and authenticated INSERT/DELETE; RLS enforces ownership. The JPEG bucket limit is 1,572,864 bytes.
 3. Enable Anonymous Sign-Ins in Supabase Auth. Reading does not create an account; contributing starts a persistent anonymous session in that browser.
 4. Put the project URL and **publishable** key in `config.js`. A legacy anon key can also work. Never include a secret or service-role key. This configuration is intentionally public client code.
 5. Serve over HTTPS and test with two independent browser sessions. A public photo Echo created in session A must appear after Refresh in session B. Its story and photo open within the proximity rule. Session B must have no Delete control for A's Echo.

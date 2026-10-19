@@ -64,6 +64,13 @@ async function main() {
     const offline = process.env.ECHO_TEST_OFFLINE === "1";
     const newContext = async (options) => {
       const context = await browser.newContext(options);
+      // Regression checks stay device-only even when the app has live configuration.
+      await context.route("**/config.js", (route) =>
+        route.fulfill({
+          contentType: "text/javascript",
+          body: "window.URBAN_ECHO_CONFIG = {};",
+        }),
+      );
       if (offline) await context.route("https://**", (route) => route.abort());
       return context;
     };
@@ -309,13 +316,11 @@ async function main() {
         await page.locator("#create").click();
         await page.locator("#title").fill("Photo validation draft");
         await page.locator("#story").fill("Keep this text when a photo fails.");
-        await page
-          .locator("#photo")
-          .setInputFiles({
-            name: "invalid.gif",
-            mimeType: "image/gif",
-            buffer: Buffer.from("bad"),
-          });
+        await page.locator("#photo").setInputFiles({
+          name: "invalid.gif",
+          mimeType: "image/gif",
+          buffer: Buffer.from("bad"),
+        });
         await page.waitForFunction(() =>
           document.querySelector("#photo-status").textContent.includes("JPEG"),
         );
@@ -323,13 +328,11 @@ async function main() {
           await page.locator("#story").inputValue(),
           "Keep this text when a photo fails.",
         );
-        await page
-          .locator("#photo")
-          .setInputFiles({
-            name: "broken.jpg",
-            mimeType: "image/jpeg",
-            buffer: Buffer.from("not an image"),
-          });
+        await page.locator("#photo").setInputFiles({
+          name: "broken.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from("not an image"),
+        });
         await page.waitForFunction(() =>
           document
             .querySelector("#photo-status")
@@ -362,13 +365,11 @@ async function main() {
         await page
           .locator("#story")
           .fill("A generated test image, never a field-test photograph.");
-        await page
-          .locator("#photo")
-          .setInputFiles({
-            name: "fixture.png",
-            mimeType: "image/png",
-            buffer: Buffer.from(png, "base64"),
-          });
+        await page.locator("#photo").setInputFiles({
+          name: "fixture.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(png, "base64"),
+        });
         await page.locator("#photo-preview").waitFor({ state: "visible" });
         await page.locator("#dialog").evaluate((dialog) => {
           const p = document.createElement("p");

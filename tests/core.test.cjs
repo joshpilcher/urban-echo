@@ -108,3 +108,39 @@ test("recorded Echo metadata preserves old records and rejects ambiguous attachm
   ])
     assert.equal(core.validEcho({ ...original, ...attachment }), false);
 });
+
+test("mixed galleries and legacy attachments normalise without losing types or order", () => {
+  const core = require("../core.js"),
+    e = {
+      id: "test",
+      title: "Memory",
+      story: "Story",
+      lat: 0,
+      lng: 0,
+      createdAt: new Date().toISOString(),
+    };
+  const items = [
+    { id: "one", kind: "photo" },
+    { id: "two", kind: "audio" },
+    { id: "three", kind: "video" },
+  ];
+  assert.equal(core.validEcho({ ...e, attachments: items }), true);
+  assert.deepEqual(core.attachments({ ...e, attachments: items }), items);
+  assert.deepEqual(core.attachments({ ...e, photoId: "old" }), [
+    { id: "old", kind: "photo", path: null },
+  ]);
+  assert.deepEqual(
+    core.attachments({ ...e, mediaId: "old", mediaKind: "audio" }),
+    [{ id: "old", kind: "audio", path: null }],
+  );
+  for (const attachments of [
+    [items[0], items[0]],
+    Array(9).fill(items[0]),
+    [{ id: "bad", kind: "html" }],
+  ])
+    assert.equal(core.validEcho({ ...e, attachments }), false);
+  assert.equal(
+    core.validEcho({ ...e, attachments: items, photoId: "legacy" }),
+    false,
+  );
+});

@@ -31,6 +31,53 @@
         }
       : null;
   }
+  const MAX_ATTACHMENTS = 8;
+  const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+  function attachments(e) {
+    if (Array.isArray(e.attachments) && e.attachments.length)
+      return e.attachments;
+    if (e.photoId || e.photoPath)
+      return [
+        { id: e.photoId || e.id, kind: "photo", path: e.photoPath || null },
+      ];
+    if (e.mediaId || e.mediaPath)
+      return [
+        { id: e.mediaId || e.id, kind: e.mediaKind, path: e.mediaPath || null },
+      ];
+    return [];
+  }
+  function validAttachments(e) {
+    if (
+      e.attachments == null ||
+      (Array.isArray(e.attachments) && !e.attachments.length)
+    )
+      return true;
+    if (
+      !Array.isArray(e.attachments) ||
+      e.attachments.length > MAX_ATTACHMENTS ||
+      e.photoId ||
+      e.photoPath ||
+      e.mediaId ||
+      e.mediaPath ||
+      e.mediaKind
+    )
+      return false;
+    const ids = new Set();
+    return e.attachments.every((a) => {
+      if (
+        !a ||
+        typeof a.id !== "string" ||
+        !/^[a-zA-Z0-9-]{1,100}$/.test(a.id) ||
+        ids.has(a.id) ||
+        !["photo", "audio", "video"].includes(a.kind) ||
+        (a.path != null &&
+          (typeof a.path !== "string" || !a.path.length || a.path.length > 240))
+      )
+        return false;
+      ids.add(a.id);
+      return true;
+    });
+  }
   function validCoordinates(p) {
     return (
       !!p &&
@@ -77,6 +124,7 @@
   function validEcho(e) {
     return (
       validCoordinates(e) &&
+      validAttachments(e) &&
       ((e.mediaKind == null && !e.mediaId && !e.mediaPath) ||
         (["audio", "video"].includes(e.mediaKind) &&
           typeof (e.mediaId || e.mediaPath) === "string" &&
@@ -96,6 +144,9 @@
     );
   }
   return {
+    MAX_ATTACHMENTS,
+    MAX_TOTAL_BYTES,
+    attachments,
     mediaInfo,
     RADIUS,
     MAX_FIX_AGE,

@@ -27,10 +27,18 @@ const row = {
 };
 function setup(options = {}) {
   const calls = [];
+  let uploads = 0,
+    inserted;
   const bucket = {
     upload: async (...args) => {
       calls.push(["upload", ...args]);
-      return { error: options.uploadError || null };
+      uploads++;
+      return {
+        error:
+          options.failUploadAt === uploads
+            ? { statusCode: 503 }
+            : options.uploadError || null,
+      };
     },
     remove: async (...args) => {
       calls.push(["remove", ...args]);
@@ -63,6 +71,7 @@ function setup(options = {}) {
         insert: (value) => {
           operation = "insert";
           calls.push(["insert", value]);
+          inserted = value;
           return q;
         },
         delete: () => {
@@ -71,7 +80,11 @@ function setup(options = {}) {
         },
         eq: () => q,
         single: async () => ({
-          data: options.insertError ? null : row,
+          data: options.insertError
+            ? null
+            : options.collection
+              ? { ...row, photo_path: null, ...inserted }
+              : row,
           error: options.insertError,
         }),
         maybeSingle: async () => ({
@@ -194,4 +207,113 @@ test("recording type mismatch is rejected before storage or row insertion", asyn
     /unsupported/,
   );
   assert.equal(calls.length, 0);
+});
+
+const mixed = [
+  {
+    id: "00000000-0000-0000-0000-000000000001",
+    kind: "photo",
+    blob: { type: "image/jpeg", size: 512 },
+  },
+  {
+    id: "00000000-0000-0000-0000-000000000002",
+    kind: "audio",
+    blob: { type: "audio/mp4", size: 1024 },
+  },
+  {
+    id: "00000000-0000-0000-0000-000000000003",
+    kind: "video",
+    blob: { type: "video/webm", size: 2048 },
+  },
+];
+test("a mixed gallery commits one row with ordered unique owner/Echo/file paths", async () => {
+  const { cloud, calls } = setup({ collection: true });
+  const saved = await cloud.createCollection(echo, mixed);
+  assert.deepEqual(
+    Array.from(saved.attachments, (a) => a.kind),
+    ["photo", "audio", "video"],
+  );
+  const uploads = calls.filter((c) => c[0] === "upload");
+  assert.equal(uploads.length, 3);
+  assert.equal(uploads[0][1], "owner/echo-id/" + mixed[0].id + ".jpg");
+  assert.equal(uploads[2][1], "owner/echo-id/" + mixed[2].id + ".webm");
+  assert.equal(calls.filter((c) => c[0] === "insert").length, 1);
+});
+test("partial gallery upload failure cleans attempted files and never inserts a partial Echo", async () => {
+  const { cloud, calls } = setup({ collection: true, failUploadAt: 2 });
+  await assert.rejects(
+    () => cloud.createCollection(echo, mixed),
+    /Attachment 2/,
+  );
+  assert.equal(calls.filter((c) => c[0] === "insert").length, 0);
+  assert.equal(calls.filter((c) => c[0] === "upload").length, 2);
+  assert.equal(
+    calls.filter((c) => c[0] === "remove").flatMap((c) => c[1]).length,
+    2,
+  );
+});
+test("gallery upload uncertainty preserves files for retry, and a committed row reconciles safely", async () => {
+  for (const committed of [false, true]) {
+    const existing = committed
+      ? {
+          ...row,
+          photo_path: null,
+          attachments: mixed.map((a) => ({
+            id: a.id,
+            kind: a.kind,
+            path: "owner/echo-id/" + a.id + ".webm",
+          })),
+        }
+      : null;
+    const { cloud, calls } = setup({
+      collection: true,
+      insertError: { message: "lost" },
+      existing,
+      lookupError: committed ? null : { message: "offline" },
+    });
+    if (committed)
+      assert.equal(
+        (await cloud.createCollection(echo, mixed)).attachments.length,
+        3,
+      );
+    else
+      await assert.rejects(() => cloud.createCollection(echo, mixed), /draft/);
+    assert.equal(
+      calls.some((c) => c[0] === "remove"),
+      false,
+    );
+  }
+});
+test("gallery count and combined size limits reject before network writes", async () => {
+  for (const attachments of [
+    Array(9).fill(mixed[0]),
+    Array.from({ length: 3 }, (_, i) => ({
+      ...mixed[2],
+      id: mixed[i].id,
+      blob: { type: "video/webm", size: 18 * 1024 * 1024 },
+    })),
+  ]) {
+    const { cloud, calls } = setup({ collection: true });
+    await assert.rejects(
+      () => cloud.createCollection(echo, attachments),
+      /50 MB/,
+    );
+    assert.equal(calls.length, 0);
+  }
+});
+test("gallery deletion removes every photo and recording before its row", async () => {
+  const { cloud, calls } = setup();
+  await cloud.remove({
+    ownerId: "owner",
+    attachments: mixed.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      path: "owner/echo-id/" + a.id + ".webm",
+    })),
+  });
+  assert.equal(
+    calls.filter((c) => c[0] === "remove").flatMap((c) => c[1]).length,
+    3,
+  );
+  assert.equal(calls.at(-1)[0], "delete");
 });

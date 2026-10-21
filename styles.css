@@ -1942,3 +1942,14 @@ textarea::placeholder {
 .clip-import { margin: 12px 0; }
 .clip-import summary { color: var(--teal); cursor: pointer; padding: 12px 0; font-size: 14px; min-height: 44px; }
 .photo-picker:has(+ input:disabled) { opacity: .5; }
+
+/* Each place can hold photos, audio and video together. */
+.attachment-summary { font-size: 13px; color: var(--teal); font-weight: 600; margin: 12px 0; }
+#photo-items, #clip-player { display: grid; gap: 14px; }
+.draft-attachment { margin: 0; min-width: 0; border: 1px solid #cbdde0; border-radius: 12px; padding: 10px; background: #fff; }
+.draft-attachment img { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; }
+.draft-attachment button { min-height: 44px; }
+.detail-hero #detail-image.media-gallery { display: grid; gap: 18px; padding: 14px 14px 32px; }
+.detail-hero:has(.media-gallery) { min-height: 0; }
+.media-item { margin: 0; padding: 0; width: 100%; min-width: 0; }
+.attachment-caption { color: #526574; font-size: 12px; margin: 8px 0 0; }

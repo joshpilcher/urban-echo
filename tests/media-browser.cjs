@@ -272,13 +272,11 @@ async function main() {
           });
           await a.locator("#clip-preview").waitFor({ state: "visible" });
           assert.equal(await a.locator("#clip-player audio").count(), 1);
-          await a
-            .locator("#photo")
-            .setInputFiles({
-              name: "bad.jpg",
-              mimeType: "image/jpeg",
-              buffer: Buffer.from("invalid"),
-            });
+          await a.locator("#photo").setInputFiles({
+            name: "bad.jpg",
+            mimeType: "image/jpeg",
+            buffer: Buffer.from("invalid"),
+          });
           await a.waitForFunction(() =>
             document
               .querySelector("#photo-status")
@@ -312,6 +310,410 @@ async function main() {
           await a.locator("#close").click();
         },
       );
+    const galleryTitle = prefix + " mixed gallery";
+    let galleryRecord;
+    const galleryShot = async (name) => {
+      await fs.mkdir(path.join(root, "test-results/screenshots"), {
+        recursive: true,
+      });
+      await a.evaluate(() => {
+        const x = document.createElement("p");
+        x.textContent = "SYNTHETIC MEDIA · SIMULATED GPS";
+        x.style =
+          "position:fixed;top:0;left:0;right:0;z-index:9999;margin:0;padding:6px;background:#f5d49a;text-align:center;font:700 10px sans-serif;";
+        document
+          .querySelector(
+            document.querySelector("#detail-dialog").open
+              ? "#detail-dialog"
+              : "#echo-form",
+          )
+          .prepend(x);
+      });
+      await a.screenshot({
+        path: path.join(
+          root,
+          "test-results/screenshots/iteration-09-" + name + ".png",
+        ),
+      });
+    };
+    await check(
+      "one draft combines multiple photos, recorded audio and video, with individual removal",
+      async () => {
+        await open(a);
+        await a.locator("#title").fill(galleryTitle);
+        await a
+          .locator("#story")
+          .fill(
+            "A synthetic photo, sound and moving image of the same place. This is browser test evidence.",
+          );
+        const image = Buffer.from(
+          await a.evaluate(() => {
+            const c = document.createElement("canvas");
+            c.width = 180;
+            c.height = 90;
+            const ctx = c.getContext("2d");
+            ctx.fillStyle = "#0b697b";
+            ctx.fillRect(0, 0, 180, 90);
+            ctx.fillStyle = "#fff";
+            ctx.font = "14px sans-serif";
+            ctx.fillText("SYNTHETIC PHOTO", 14, 50);
+            return c.toDataURL("image/png").split(",")[1];
+          }),
+          "base64",
+        );
+        const file = {
+          name: "synthetic.png",
+          mimeType: "image/png",
+          buffer: image,
+        };
+        await a.locator("#photo").setInputFiles([file, file]);
+        await a.waitForFunction(
+          () =>
+            document.querySelectorAll("#photo-items img").length === 2 &&
+            !document.querySelector("#save-echo").disabled,
+        );
+        for (const kind of ["audio", "video"]) {
+          await a.locator("#record-" + kind).click();
+          await a.waitForFunction(() =>
+            document
+              .querySelector("#recording-status")
+              .textContent.includes("Recording "),
+          );
+          await a.waitForTimeout(1300);
+          await a.locator("#record-stop").click();
+          await a.waitForFunction(
+            (kind) =>
+              document.querySelectorAll("#clip-player " + kind).length === 1 &&
+              !document.querySelector("#save-echo").disabled,
+            kind,
+          );
+        }
+        assert.equal(await a.locator(".draft-attachment").count(), 4);
+        await a.locator("#photo-remove").click();
+        assert.equal(await a.locator("#photo-items img").count(), 1);
+        assert.equal(await a.locator("#clip-player audio").count(), 1);
+        assert.equal(await a.locator("#clip-player video").count(), 1);
+        const kept = await a
+          .locator(".draft-attachment")
+          .evaluateAll((items) => items.map((x) => x.dataset.attachmentId));
+        await a.locator("#photo").setInputFiles(Array(5).fill(file));
+        await a.waitForFunction(
+          () =>
+            document.querySelectorAll(".draft-attachment").length === 8 &&
+            !document.querySelector("#save-echo").disabled,
+        );
+        assert.equal(await a.locator("#record-video").isDisabled(), true);
+        assert.equal(await a.locator("#record-audio").isDisabled(), true);
+        const extra = await a
+          .locator(".draft-attachment")
+          .evaluateAll(
+            (items, kept) =>
+              items
+                .map((x) => x.dataset.attachmentId)
+                .filter((id) => !kept.includes(id)),
+            kept,
+          );
+        for (const id of extra)
+          await a.locator('[data-remove-attachment="' + id + '"]').click();
+        assert.equal(await a.locator(".draft-attachment").count(), 3);
+        assert.equal(await a.locator("#record-audio").isEnabled(), true);
+        await a
+          .locator("#audio-file")
+          .setInputFiles({
+            name: "invalid.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("invalid"),
+          });
+        await a.waitForFunction(() =>
+          document
+            .querySelector("#clip-status")
+            .textContent.includes("supported"),
+        );
+        assert.equal(await a.locator(".draft-attachment").count(), 3);
+        for (const viewport of [
+          { width: 320, height: 568 },
+          { width: 390, height: 844 },
+          { width: 844, height: 390 },
+        ]) {
+          await a.setViewportSize(viewport);
+          assert.equal(
+            await a
+              .locator("#dialog")
+              .evaluate((d) => d.scrollWidth <= d.clientWidth + 1),
+            true,
+          );
+        }
+        await a.setViewportSize({ width: 390, height: 844 });
+        await a.locator("#clip-preview").scrollIntoViewIfNeeded();
+        await galleryShot("create");
+      },
+    );
+    await check(
+      "failed multi-file save preserves the whole draft and cleans partial storage before retry",
+      async () => {
+        if (shared) {
+          let failurePath;
+          await a.route(
+            "**/storage/v1/object/urban-echo-recordings/**",
+            (route) => {
+              if (route.request().method() === "POST" && !failurePath) {
+                failurePath = decodeURIComponent(
+                  new URL(route.request().url()).pathname.split(
+                    "/object/urban-echo-recordings/",
+                  )[1],
+                );
+                return route.fulfill({
+                  status: 503,
+                  contentType: "application/json",
+                  body: JSON.stringify({
+                    message: "Synthetic upload interruption",
+                    error: "SyntheticFailure",
+                    statusCode: 503,
+                  }),
+                });
+              }
+              return route.continue();
+            },
+          );
+          await a.locator("#visibility-public").check();
+          await emit(a);
+          await a.locator("#save-echo").click();
+          await a.waitForFunction(() =>
+            document
+              .querySelector("#form-error")
+              .textContent.includes("Attachment"),
+          );
+          assert.equal(await a.locator(".draft-attachment").count(), 3);
+          assert.ok(failurePath);
+          const result = await a.evaluate(
+            async ({ folder, title }) => {
+              const c = supabase.createClient(
+                URBAN_ECHO_CONFIG.supabaseUrl,
+                URBAN_ECHO_CONFIG.supabasePublishableKey,
+              );
+              const sizes = [];
+              for (const name of [
+                "urban-echo-photos",
+                "urban-echo-recordings",
+              ]) {
+                const r = await c.storage.from(name).list(folder);
+                if (r.error) throw r.error;
+                sizes.push(r.data.length);
+              }
+              return {
+                sizes,
+                exists: (await EchoCloud.load()).some((e) => e.title === title),
+              };
+            },
+            {
+              folder: failurePath.split("/").slice(0, 2).join("/"),
+              title: galleryTitle,
+            },
+          );
+          assert.deepEqual(result.sizes, [0, 0]);
+          assert.equal(result.exists, false);
+          await a.unroute("**/storage/v1/object/urban-echo-recordings/**");
+        } else {
+          const ids = await a
+            .locator(".draft-attachment")
+            .evaluateAll((items) => items.map((x) => x.dataset.attachmentId));
+          await a.evaluate(() => {
+            window.__setItem = Storage.prototype.setItem;
+            Storage.prototype.setItem = function (key, value) {
+              if (key === "urban-echo-v1")
+                throw new DOMException(
+                  "Synthetic quota failure",
+                  "QuotaExceededError",
+                );
+              return window.__setItem.call(this, key, value);
+            };
+          });
+          await emit(a);
+          await a.locator("#save-echo").click();
+          await a.waitForFunction(() =>
+            document
+              .querySelector("#form-error")
+              .textContent.includes("storage"),
+          );
+          assert.equal(await a.locator(".draft-attachment").count(), 3);
+          assert.equal(
+            await a.evaluate(
+              async (ids) =>
+                (await Promise.all(ids.map((id) => EchoMedia.get(id)))).every(
+                  (blob) => !blob,
+                ),
+              ids,
+            ),
+            true,
+          );
+          await a.evaluate(
+            () => (Storage.prototype.setItem = window.__setItem),
+          );
+        }
+        await emit(a);
+        await a.locator("#save-echo").click();
+        await a.locator("#dialog").waitFor({ state: "hidden" });
+      },
+    );
+    await check(
+      "a mixed Echo persists and reveals all three media types together without playback resets",
+      async () => {
+        await a.reload();
+        await a.locator("#locate").click();
+        await emit(a);
+        await a.locator("#nav-nearby").click();
+        await a.locator(".echo").filter({ hasText: galleryTitle }).click();
+        await a.locator("#detail-image img").waitFor();
+        await a.locator("#detail-image audio").waitFor();
+        await a.locator("#detail-image video").waitFor();
+        assert.equal(await a.locator("#detail-image .media-item").count(), 3);
+        await a.locator("#detail-image audio").evaluate((p) => p.play());
+        await a.locator("#detail-image video").evaluate((p) => p.play());
+        await a.evaluate(
+          () =>
+            (window.__galleryPlayers = [
+              ...document.querySelectorAll(
+                "#detail-image audio,#detail-image video",
+              ),
+            ]),
+        );
+        await emit(a);
+        assert.equal(
+          await a.evaluate(() => __galleryPlayers.every((p) => p.isConnected)),
+          true,
+        );
+        await a.locator("#detail-dialog").evaluate((d) => (d.scrollTop = 0));
+        await galleryShot("detail");
+        await emit(a, { ...point, latitude: point.latitude + 0.003 });
+        assert.equal(
+          await a
+            .locator(
+              "#detail-image img,#detail-image audio,#detail-image video",
+            )
+            .count(),
+          0,
+        );
+        assert.equal(
+          await a.evaluate(() => __galleryPlayers.every((p) => p.paused)),
+          true,
+        );
+        await emit(a);
+        await a.locator("#detail-image video").waitFor();
+        galleryRecord = await a.evaluate(
+          async ({ title, shared }) =>
+            shared
+              ? (await EchoCloud.load()).find((e) => e.title === title)
+              : JSON.parse(localStorage.getItem("urban-echo-v1")).find(
+                  (e) => e.title === title,
+                ),
+          { title: galleryTitle, shared },
+        );
+        assert.deepEqual(
+          galleryRecord.attachments.map((x) => x.kind),
+          ["photo", "audio", "video"],
+        );
+        await a.locator("#detail-close").click();
+      },
+    );
+    if (shared)
+      await check(
+        "a second session plays the full gallery but cannot delete its files or forge gallery paths",
+        async () => {
+          await b.locator("#nav-map").click();
+          await b.locator("#refresh-shared").click();
+          await emit(b);
+          await b.locator("#nav-nearby").click();
+          await b.locator(".echo").filter({ hasText: galleryTitle }).click();
+          await b.locator("#detail-image img").waitFor();
+          await b.locator("#detail-image audio").evaluate((p) => p.play());
+          await b.locator("#detail-image video").evaluate((p) => p.play());
+          assert.equal(await b.locator("#delete-echo").isVisible(), false);
+          const result = await b.evaluate(async (row) => {
+            const c = supabase.createClient(
+              URBAN_ECHO_CONFIG.supabaseUrl,
+              URBAN_ECHO_CONFIG.supabasePublishableKey,
+            );
+            let session = (await c.auth.getSession()).data.session;
+            if (!session)
+              session = (await c.auth.signInAnonymously()).data.session;
+            const removed = [];
+            for (const a of row.attachments) {
+              const r = await c.storage
+                .from(
+                  a.kind === "photo"
+                    ? "urban-echo-photos"
+                    : "urban-echo-recordings",
+                )
+                .remove([a.path]);
+              removed.push(r.data);
+            }
+            const deletion = await c
+              .from("urban_echoes")
+              .delete()
+              .eq("id", row.id)
+              .select();
+            const forged = await c
+              .from("urban_echoes")
+              .insert({
+                id: crypto.randomUUID(),
+                owner_id: session.user.id,
+                title: "Synthetic invalid gallery",
+                story: "Must be rejected",
+                lat: 0,
+                lng: 0,
+                attachments: row.attachments,
+              });
+            return {
+              removed,
+              deleted: deletion.data,
+              forged: forged.error?.code,
+            };
+          }, galleryRecord);
+          assert.deepEqual(result.removed, [[], [], []]);
+          assert.deepEqual(result.deleted, []);
+          assert.equal(result.forged, "23514");
+          await b.locator("#detail-close").click();
+        },
+      );
+    await check(
+      "creator deletion removes every attachment from the mixed Echo",
+      async () => {
+        await a.locator(".echo").filter({ hasText: galleryTitle }).click();
+        await a.locator("#delete-echo").click();
+        await a.locator("#delete-yes").click();
+        await a.locator("#detail-dialog").waitFor({ state: "hidden" });
+        if (shared) {
+          const counts = await a.evaluate(async (row) => {
+            const c = supabase.createClient(
+              URBAN_ECHO_CONFIG.supabaseUrl,
+              URBAN_ECHO_CONFIG.supabasePublishableKey,
+            );
+            const counts = [];
+            for (const name of ["urban-echo-photos", "urban-echo-recordings"]) {
+              const r = await c.storage
+                .from(name)
+                .list(row.ownerId + "/" + row.id);
+              if (r.error) throw r.error;
+              counts.push(r.data.length);
+            }
+            return counts;
+          }, galleryRecord);
+          assert.deepEqual(counts, [0, 0]);
+        } else
+          assert.equal(
+            await a.evaluate(
+              async (row) =>
+                (
+                  await Promise.all(
+                    row.attachments.map((a) => EchoMedia.get(a.id)),
+                  )
+                ).every((blob) => !blob),
+              galleryRecord,
+            ),
+            true,
+          );
+      },
+    );
     for (const kind of ["audio", "video"]) {
       const title = prefix + " " + kind;
       await check(
@@ -440,11 +842,11 @@ async function main() {
                 .select();
               const object = await c.storage
                 .from("urban-echo-recordings")
-                .remove([row.mediaPath]);
+                .remove([EchoCore.attachments(row)[0].path]);
               const upload = await c.storage
                 .from("urban-echo-recordings")
                 .upload(
-                  row.mediaPath + ".webm",
+                  EchoCore.attachments(row)[0].path + ".webm",
                   new Blob(["x"], { type: "video/webm" }),
                 );
               return {
@@ -485,8 +887,11 @@ async function main() {
                 );
                 const o = await c.storage
                   .from("urban-echo-recordings")
-                  .list(r.ownerId);
-                return o.data.some((f) => f.name === r.mediaPath.split("/")[1]);
+                  .list(r.ownerId + "/" + r.id);
+                return o.data.some(
+                  (f) =>
+                    f.name === EchoCore.attachments(r)[0].path.split("/").pop(),
+                );
               }, record),
               false,
             );
@@ -499,7 +904,10 @@ async function main() {
               .waitFor({ state: "hidden" });
           } else
             assert.equal(
-              await a.evaluate((id) => EchoMedia.get(id), record.mediaId),
+              await a.evaluate(
+                (id) => EchoMedia.get(id),
+                record.attachments[0].id,
+              ),
               undefined,
             );
         },

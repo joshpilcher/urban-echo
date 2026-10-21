@@ -310,7 +310,9 @@ async function main() {
           await a.locator("#close").click();
         },
       );
-    const galleryTitle = prefix + " mixed gallery";
+    const galleryTitle = shared
+      ? prefix + " mixed gallery"
+      : "A moment by the water";
     let galleryRecord;
     const galleryShot = async (name) => {
       await fs.mkdir(path.join(root, "test-results/screenshots"), {
@@ -332,7 +334,7 @@ async function main() {
       await a.screenshot({
         path: path.join(
           root,
-          "test-results/screenshots/iteration-09-" + name + ".png",
+          "test-results/screenshots/iteration-10-" + name + ".png",
         ),
       });
     };
@@ -344,7 +346,7 @@ async function main() {
         await a
           .locator("#story")
           .fill(
-            "A synthetic photo, sound and moving image of the same place. This is browser test evidence.",
+            "A photo, a voice and a moving moment, captured here. Synthetic media for testing the Echo viewing interface.",
           );
         const image = Buffer.from(
           await a.evaluate(() => {
@@ -417,13 +419,11 @@ async function main() {
           await a.locator('[data-remove-attachment="' + id + '"]').click();
         assert.equal(await a.locator(".draft-attachment").count(), 3);
         assert.equal(await a.locator("#record-audio").isEnabled(), true);
-        await a
-          .locator("#audio-file")
-          .setInputFiles({
-            name: "invalid.txt",
-            mimeType: "text/plain",
-            buffer: Buffer.from("invalid"),
-          });
+        await a.locator("#audio-file").setInputFiles({
+          name: "invalid.txt",
+          mimeType: "text/plain",
+          buffer: Buffer.from("invalid"),
+        });
         await a.waitForFunction(() =>
           document
             .querySelector("#clip-status")
@@ -564,16 +564,131 @@ async function main() {
         await a.locator("#nav-nearby").click();
         await a.locator(".echo").filter({ hasText: galleryTitle }).click();
         await a.locator("#detail-image img").waitFor();
-        await a.locator("#detail-image audio").waitFor();
+        await a.locator("#detail-dialog audio").waitFor();
+        await a.locator('.media-thumbnail[aria-label^="View video"]').click();
         await a.locator("#detail-image video").waitFor();
-        assert.equal(await a.locator("#detail-image .media-item").count(), 3);
-        await a.locator("#detail-image audio").evaluate((p) => p.play());
+        assert.equal(
+          await a.locator("#detail-dialog [data-attachment-id]").count(),
+          3,
+        );
+        if (!shared)
+          await check(
+            "mock-up detail uses one hero, accessible thumbnails and audio below the story",
+            async () => {
+              await a
+                .locator('.media-thumbnail[aria-label^="View photo"]')
+                .click();
+              assert.equal(await a.locator(".hero-media:visible").count(), 1);
+              assert.equal(await a.locator(".media-thumbnail").count(), 2);
+              assert.equal(
+                await a
+                  .locator('.media-thumbnail[aria-pressed="true"]')
+                  .getAttribute("aria-label"),
+                "View photo 1",
+              );
+              const order = await a.evaluate(() => {
+                const story = document.querySelector("#detail-story"),
+                  audio = document.querySelector("#detail-audio"),
+                  thumbs = document.querySelector("#detail-gallery");
+                return (
+                  !!(
+                    story.compareDocumentPosition(audio) &
+                    Node.DOCUMENT_POSITION_FOLLOWING
+                  ) &&
+                  !!(
+                    audio.compareDocumentPosition(thumbs) &
+                    Node.DOCUMENT_POSITION_FOLLOWING
+                  )
+                );
+              });
+              assert.equal(order, true);
+              for (const viewport of [
+                { width: 320, height: 568 },
+                { width: 390, height: 844 },
+                { width: 844, height: 390 },
+              ]) {
+                await a.setViewportSize(viewport);
+                const fits = await a
+                  .locator("#detail-dialog")
+                  .evaluate((d) => d.scrollWidth <= d.clientWidth + 1);
+                assert.equal(fits, true);
+                for (const button of await a
+                  .locator(".media-thumbnail")
+                  .all()) {
+                  const box = await button.boundingBox();
+                  assert.ok(box.width >= 44 && box.height >= 44);
+                }
+              }
+              await a.setViewportSize({ width: 390, height: 844 });
+              await a
+                .locator("#detail-dialog")
+                .evaluate((d) => (d.scrollTop = 0));
+              await galleryShot("photo-detail");
+              await a
+                .locator('.media-thumbnail[aria-label^="View video"]')
+                .focus();
+              await a.keyboard.press("Enter");
+              assert.equal(
+                await a.locator(".hero-media:visible video").count(),
+                1,
+              );
+              await a.locator("#detail-dialog audio").evaluate((p) => p.play());
+              await a.locator("#detail-image video").evaluate((p) => p.play());
+              assert.equal(
+                await a
+                  .locator("#detail-dialog audio")
+                  .evaluate((p) => p.paused),
+                true,
+              );
+              await a
+                .locator('.media-thumbnail[aria-label^="View photo"]')
+                .click();
+              assert.equal(
+                await a
+                  .locator("#detail-image video")
+                  .evaluate((p) => p.paused),
+                true,
+              );
+              await a
+                .locator('.media-thumbnail[aria-label^="View video"]')
+                .click();
+              await a.locator("#detail-dialog audio").evaluate((p) => {
+                window.__uiAudio = p;
+                return p.play();
+              });
+              await a.locator("#detail-close").click();
+              assert.equal(await a.evaluate(() => __uiAudio.paused), true);
+              await emit(a);
+              await a
+                .locator(".echo")
+                .filter({ hasText: galleryTitle })
+                .click();
+              await a
+                .locator('.media-thumbnail[aria-label^="View video"]')
+                .click();
+              await a.locator("#detail-dialog audio").evaluate((p) => {
+                window.__uiAudio = p;
+                return p.play();
+              });
+              await a.keyboard.press("Escape");
+              assert.equal(await a.evaluate(() => __uiAudio.paused), true);
+              await emit(a);
+              await a
+                .locator(".echo")
+                .filter({ hasText: galleryTitle })
+                .click();
+              await a
+                .locator('.media-thumbnail[aria-label^="View video"]')
+                .click();
+            },
+          );
+        await a.locator("#detail-dialog audio").evaluate((p) => p.play());
         await a.locator("#detail-image video").evaluate((p) => p.play());
         await a.evaluate(
           () =>
             (window.__galleryPlayers = [
               ...document.querySelectorAll(
-                "#detail-image audio,#detail-image video",
+                "#detail-dialog audio,#detail-image video",
               ),
             ]),
         );
@@ -588,7 +703,7 @@ async function main() {
         assert.equal(
           await a
             .locator(
-              "#detail-image img,#detail-image audio,#detail-image video",
+              "#detail-image img,#detail-dialog audio,#detail-image video",
             )
             .count(),
           0,
@@ -598,6 +713,7 @@ async function main() {
           true,
         );
         await emit(a);
+        await a.locator('.media-thumbnail[aria-label^="View video"]').click();
         await a.locator("#detail-image video").waitFor();
         galleryRecord = await a.evaluate(
           async ({ title, shared }) =>
@@ -625,7 +741,8 @@ async function main() {
           await b.locator("#nav-nearby").click();
           await b.locator(".echo").filter({ hasText: galleryTitle }).click();
           await b.locator("#detail-image img").waitFor();
-          await b.locator("#detail-image audio").evaluate((p) => p.play());
+          await b.locator("#detail-dialog audio").evaluate((p) => p.play());
+          await b.locator('.media-thumbnail[aria-label^="View video"]').click();
           await b.locator("#detail-image video").evaluate((p) => p.play());
           assert.equal(await b.locator("#delete-echo").isVisible(), false);
           const result = await b.evaluate(async (row) => {
@@ -652,17 +769,15 @@ async function main() {
               .delete()
               .eq("id", row.id)
               .select();
-            const forged = await c
-              .from("urban_echoes")
-              .insert({
-                id: crypto.randomUUID(),
-                owner_id: session.user.id,
-                title: "Synthetic invalid gallery",
-                story: "Must be rejected",
-                lat: 0,
-                lng: 0,
-                attachments: row.attachments,
-              });
+            const forged = await c.from("urban_echoes").insert({
+              id: crypto.randomUUID(),
+              owner_id: session.user.id,
+              title: "Synthetic invalid gallery",
+              story: "Must be rejected",
+              lat: 0,
+              lng: 0,
+              attachments: row.attachments,
+            });
             return {
               removed,
               deleted: deletion.data,
@@ -763,7 +878,7 @@ async function main() {
           await emit(a);
           await a.locator("#nav-nearby").click();
           await a.locator(".echo").filter({ hasText: title }).click();
-          const player = a.locator("#detail-image " + kind);
+          const player = a.locator("#detail-dialog " + kind);
           await player.waitFor();
           await player.evaluate((p) => p.play());
           await a.waitForTimeout(350);
@@ -772,7 +887,7 @@ async function main() {
           await a.evaluate(
             () =>
               (window.__savedPlayer = document.querySelector(
-                "#detail-image audio,#detail-image video",
+                "#detail-dialog audio,#detail-image video",
               )),
           );
           await emit(a);
@@ -781,19 +896,19 @@ async function main() {
               () =>
                 window.__savedPlayer ===
                 document.querySelector(
-                  "#detail-image audio,#detail-image video",
+                  "#detail-dialog audio,#detail-image video",
                 ),
             ),
             true,
           );
           await emit(a, { ...point, latitude: point.latitude + 0.003 });
-          assert.equal(await a.locator("#detail-image " + kind).count(), 0);
+          assert.equal(await a.locator("#detail-dialog " + kind).count(), 0);
           assert.equal(
             await a.evaluate(() => window.__savedPlayer.paused),
             true,
           );
           await emit(a);
-          await a.locator("#detail-image " + kind).waitFor();
+          await a.locator("#detail-dialog " + kind).waitFor();
           if (kind === "video") {
             await a.evaluate(() => {
               const x = document.createElement("p");
@@ -823,8 +938,8 @@ async function main() {
             await emit(b);
             await b.locator("#nav-nearby").click();
             await b.locator(".echo").filter({ hasText: title }).click();
-            await b.locator("#detail-image " + kind).waitFor();
-            await b.locator("#detail-image " + kind).evaluate((p) => p.play());
+            await b.locator("#detail-dialog " + kind).waitFor();
+            await b.locator("#detail-dialog " + kind).evaluate((p) => p.play());
             assert.equal(await b.locator("#delete-echo").isVisible(), false);
             const result = await b.evaluate(async (title) => {
               const row = (await EchoCloud.load()).find(

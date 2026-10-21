@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.5.0</span
+          <span class="version">WORKING PROTOTYPE · 0.5.1</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -448,6 +448,24 @@
         </div>
         <p id="detail-story" class="detail-story"></p>
         <small id="detail-date"></small>
+        <section
+          id="detail-audio"
+          class="detail-audio"
+          aria-label="Audio memories"
+          hidden
+        ></section>
+        <section
+          id="detail-gallery"
+          class="detail-gallery"
+          aria-label="Photos and videos"
+          hidden
+        >
+          <div class="gallery-heading">
+            <h3>More from this place</h3>
+            <span id="detail-gallery-count"></span>
+          </div>
+          <div id="detail-thumbnails" class="detail-thumbnails"></div>
+        </section>
         <p id="detail-notice" class="privacy-note"></p>
         <button id="delete-echo" class="text-button danger" hidden>
           Delete this Echo

@@ -263,6 +263,7 @@
       pin.bindTooltip(node("span", "", e.title));
     });
   }
+  let detailVisualId = null;
   function drawDetail() {
     if (!$("detail-dialog").open) return;
     const e = allRecords().find((e) => e.id === selectedId);
@@ -284,81 +285,7 @@
       undefined,
       { year: "numeric", month: "long", day: "numeric" },
     );
-    const imageArea = $("detail-image"),
-      items = Core.attachments(e);
-    const key = e.id + ":" + e.state;
-    if (imageArea.dataset.mediaKey !== key) {
-      pausePlayers(imageArea);
-      imageArea.replaceChildren();
-      imageArea.dataset.mediaKey = key;
-    }
-    imageArea.classList.toggle(
-      "media-gallery",
-      items.length > 0 && e.state === "unlocked",
-    );
-    if (e.state !== "unlocked" || !items.length) {
-      if (!imageArea.firstChild)
-        imageArea.append(icon(e.state === "unlocked" ? "story" : "lock"));
-    } else {
-      for (const child of [...imageArea.children])
-        if (!items.some((a) => a.id === child.dataset.attachmentId)) {
-          pausePlayers(child);
-          child.remove();
-        }
-      items.forEach((a, index) => {
-        let area = [...imageArea.children].find(
-          (el) => el.dataset.attachmentId === a.id,
-        );
-        if (!area) {
-          area = node("figure", "media-item");
-          area.dataset.attachmentId = a.id;
-          imageArea.append(area);
-        }
-        const url = attachmentURL(e, a);
-        if (url && area.dataset.url !== url) {
-          pausePlayers(area);
-          area.replaceChildren();
-          area.dataset.url = url;
-          const player = node(a.kind === "photo" ? "img" : a.kind);
-          if (a.kind === "photo")
-            player.alt =
-              "Photo " + (index + 1) + " attached to “" + e.title + "”";
-          else {
-            player.controls = true;
-            player.preload = "metadata";
-            player.setAttribute("playsinline", "");
-            player.setAttribute(
-              "aria-label",
-              a.kind + " attachment " + (index + 1) + ": " + e.title,
-            );
-          }
-          const feedback = node("p", "media-feedback");
-          feedback.setAttribute("role", "status");
-          player.addEventListener("error", () => {
-            feedback.textContent =
-              "This attachment could not load here. Check your connection or try another browser.";
-          });
-          player.src = url;
-          area.append(
-            player,
-            feedback,
-            node(
-              "figcaption",
-              "attachment-caption",
-              index +
-                1 +
-                " of " +
-                items.length +
-                " · " +
-                { photo: "Photo", video: "Video", audio: "Audio" }[a.kind],
-            ),
-          );
-        } else if (!url && !area.firstChild)
-          area.append(node("p", "muted", "Loading attachment…"));
-        if (!url && e.source !== "shared" && photos.get(photoKey(e, a))?.ready)
-          area.textContent = "This attachment is unavailable in this browser.";
-      });
-    }
+    drawDetailMedia(e);
     $("detail-notice").textContent =
       e.source === "shared"
         ? "A memory shared with everyone. In-app discovery opens within 100 metres; public content is not private."
@@ -368,6 +295,167 @@
     $("detail-close").disabled = deleting;
     $("delete-yes").disabled = deleting;
     $("delete-no").disabled = deleting;
+  }
+  function drawDetailMedia(e) {
+    const hero = $("detail-image"),
+      audio = $("detail-audio"),
+      thumbs = $("detail-thumbnails"),
+      items = Core.attachments(e);
+    const unlocked = e.state === "unlocked",
+      key = e.id + ":" + unlocked;
+    if (hero.dataset.mediaKey !== key) {
+      pausePlayers($("detail-dialog"));
+      hero.replaceChildren();
+      audio.replaceChildren();
+      thumbs.replaceChildren();
+      hero.dataset.mediaKey = key;
+      detailVisualId = null;
+    }
+    const visuals = items.filter((a) => a.kind !== "audio"),
+      sounds = items.filter((a) => a.kind === "audio");
+    $("detail-gallery").hidden = !unlocked || !visuals.length;
+    audio.hidden = !unlocked || !sounds.length;
+    $("detail-hero").classList.toggle(
+      "has-visual",
+      unlocked && visuals.length > 0,
+    );
+    if (!unlocked || !visuals.length) {
+      if (!hero.firstChild) {
+        const placeholder = node("div", "detail-placeholder");
+        placeholder.append(
+          icon(!unlocked ? "lock" : sounds.length ? "audio" : "story"),
+        );
+        if (unlocked && sounds.length)
+          placeholder.append(node("span", "", "Sounds of this place"));
+        hero.append(placeholder);
+      }
+    }
+    if (!unlocked) return;
+    if (!visuals.some((a) => a.id === detailVisualId))
+      detailVisualId =
+        visuals.find((a) => a.kind === "photo")?.id || visuals[0]?.id;
+    function updateMedia(area, a, index) {
+      const url = attachmentURL(e, a);
+      if (url && area.dataset.url !== url) {
+        pausePlayers(area);
+        area.replaceChildren();
+        area.dataset.url = url;
+        const player = node(a.kind === "photo" ? "img" : a.kind);
+        if (a.kind === "photo")
+          player.alt =
+            "Photo " + (index + 1) + " attached to “" + e.title + "”";
+        else {
+          player.controls = true;
+          player.preload =
+            a.kind === "video" && a.id !== detailVisualId ? "none" : "metadata";
+          player.setAttribute("playsinline", "");
+          player.setAttribute(
+            "aria-label",
+            a.kind + " memory " + (index + 1) + ": " + e.title,
+          );
+          player.addEventListener("play", () => {
+            $("detail-dialog")
+              .querySelectorAll("audio,video")
+              .forEach((other) => {
+                if (other !== player) other.pause();
+              });
+          });
+        }
+        const feedback = node("p", "media-feedback");
+        feedback.setAttribute("role", "status");
+        player.addEventListener("error", () => {
+          feedback.textContent =
+            "This attachment could not load. Check your connection or try another browser.";
+        });
+        player.src = url;
+        area.append(player, feedback);
+      } else if (!url && !area.firstChild)
+        area.append(node("p", "muted", "Loading attachment…"));
+      if (!url && e.source !== "shared" && photos.get(photoKey(e, a))?.ready)
+        area.textContent = "This attachment is unavailable in this browser.";
+      return url;
+    }
+    visuals.forEach((a, index) => {
+      let area = [...hero.children].find(
+        (el) => el.dataset.attachmentId === a.id,
+      );
+      if (!area) {
+        area = node("figure", "media-item hero-media");
+        area.dataset.attachmentId = a.id;
+        hero.append(area);
+      }
+      const active = a.id === detailVisualId;
+      if (!active) pausePlayers(area);
+      area.hidden = !active;
+      const url = updateMedia(area, a, index);
+      let button = [...thumbs.children].find(
+        (el) => el.dataset.selectVisual === a.id,
+      );
+      if (!button) {
+        button = node("button", "media-thumbnail");
+        button.type = "button";
+        button.dataset.selectVisual = a.id;
+        button.setAttribute(
+          "aria-label",
+          "View " +
+            (a.kind === "photo" ? "photo" : "video") +
+            " " +
+            (index + 1),
+        );
+        button.append(
+          icon(a.kind === "photo" ? "camera" : "video"),
+          node(
+            "span",
+            "thumbnail-caption",
+            (a.kind === "photo" ? "Photo " : "Video ") + (index + 1),
+          ),
+        );
+        button.addEventListener("click", () => {
+          detailVisualId = a.id;
+          drawDetail();
+          $("detail-hero").scrollIntoView({
+            block: "start",
+            behavior: reducedMotion ? "instant" : "smooth",
+          });
+        });
+        thumbs.append(button);
+      }
+      if (a.kind === "photo" && url && !button.querySelector("img")) {
+        const image = node("img");
+        image.src = url;
+        image.alt = "";
+        image.loading = "lazy";
+        button.prepend(image);
+      }
+      button.setAttribute("aria-pressed", String(active));
+    });
+    $("detail-gallery-count").textContent =
+      visuals.length + (visuals.length === 1 ? " moment" : " moments");
+    sounds.forEach((a, index) => {
+      let card = [...audio.children].find(
+        (el) => el.dataset.attachmentId === a.id,
+      );
+      if (!card) {
+        card = node("div", "audio-memory");
+        card.dataset.attachmentId = a.id;
+        const heading = node("div", "audio-heading");
+        heading.append(
+          icon("audio"),
+          node(
+            "strong",
+            "",
+            sounds.length === 1
+              ? "Listen to this place"
+              : "Audio memory " + (index + 1),
+          ),
+        );
+        const playerArea = node("div", "audio-player");
+        card.append(heading, playerArea);
+        audio.append(card);
+      }
+      // Each audio memory stays compact and remains directly playable beneath the story.
+      updateMedia(card.querySelector(".audio-player"), a, index);
+    });
   }
   function openDetail(id) {
     selectedId = id;
@@ -1040,7 +1128,7 @@
     pausePlayers($("clip-player"));
   });
   $("detail-dialog").addEventListener("close", () =>
-    pausePlayers($("detail-image")),
+    pausePlayers($("detail-dialog")),
   );
   $("title").addEventListener("input", updateForm);
   $("story").addEventListener("input", updateForm);
@@ -1072,9 +1160,13 @@
   $("dialog").addEventListener("cancel", (event) => {
     if (saving) event.preventDefault();
   });
-  $("detail-close").addEventListener("click", () => $("detail-dialog").close());
+  $("detail-close").addEventListener("click", () => {
+    pausePlayers($("detail-dialog"));
+    $("detail-dialog").close();
+  });
   $("detail-dialog").addEventListener("cancel", (event) => {
     if (deleting) event.preventDefault();
+    else pausePlayers($("detail-dialog"));
   });
   $("filter-all").addEventListener("click", () => {
     filter = "all";
@@ -1297,7 +1389,7 @@
   window.addEventListener("pagehide", () => {
     recorder.cancel();
     pausePlayers($("clip-player"));
-    pausePlayers($("detail-image"));
+    pausePlayers($("detail-dialog"));
     stopTracking();
     for (const entry of photos.values())
       if (entry.url) URL.revokeObjectURL(entry.url);
@@ -1310,7 +1402,7 @@
     if (document.hidden) {
       recorder.cancel();
       pausePlayers($("clip-player"));
-      pausePlayers($("detail-image"));
+      pausePlayers($("detail-dialog"));
     }
     if (!document.hidden) {
       if (fix && !Core.freshFix(fix)) {

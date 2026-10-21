@@ -1034,16 +1034,14 @@ textarea::placeholder {
 /* Phone layouts: Map previews one memory; Nearby uses the full content area. */
 @media (max-width: 900px) {
   .app {
-    grid-template-rows: calc(60px + env(safe-area-inset-top)) 82px minmax(
-        0,
-        1fr
-      ) calc(68px + env(safe-area-inset-bottom));
+    grid-template-rows:
+      calc(60px + env(safe-area-inset-top)) 82px minmax(0, 1fr)
+      calc(68px + env(safe-area-inset-bottom));
   }
   .app:has(.search-bar:not([hidden])) {
-    grid-template-rows: calc(60px + env(safe-area-inset-top)) 82px 54px minmax(
-        0,
-        1fr
-      ) calc(68px + env(safe-area-inset-bottom));
+    grid-template-rows:
+      calc(60px + env(safe-area-inset-top)) 82px 54px minmax(0, 1fr)
+      calc(68px + env(safe-area-inset-bottom));
   }
   .topbar {
     padding: env(safe-area-inset-top) 20px 0;
@@ -1565,16 +1563,14 @@ textarea::placeholder {
 /* In a short viewport, prioritise usable controls over the map preview. */
 @media (max-width: 900px) and (max-height: 650px) {
   .app {
-    grid-template-rows: calc(54px + env(safe-area-inset-top)) 74px minmax(
-        0,
-        1fr
-      ) calc(60px + env(safe-area-inset-bottom));
+    grid-template-rows:
+      calc(54px + env(safe-area-inset-top)) 74px minmax(0, 1fr)
+      calc(60px + env(safe-area-inset-bottom));
   }
   .app:has(.search-bar:not([hidden])) {
-    grid-template-rows: calc(54px + env(safe-area-inset-top)) 74px 50px minmax(
-        0,
-        1fr
-      ) calc(60px + env(safe-area-inset-bottom));
+    grid-template-rows:
+      calc(54px + env(safe-area-inset-top)) 74px 50px minmax(0, 1fr)
+      calc(60px + env(safe-area-inset-bottom));
   }
   .sidebar:not(.is-expanded) {
     height: 196px;
@@ -1617,9 +1613,6 @@ textarea::placeholder {
   }
   .tracking-controls {
     display: none;
-  }
-  .tracking-controls:has(#stop:not([hidden])) {
-    display: flex;
   }
   .tracking-controls small {
     display: none;
@@ -1701,5 +1694,117 @@ textarea::placeholder {
 @media (max-width: 900px) {
   .sidebar:not(.is-expanded) .echo ~ .echo {
     display: none;
+  }
+}
+
+/* Map-first phone view: memories live in Nearby, not over the map. */
+.location-close {
+  display: none;
+}
+@media (max-width: 900px) {
+  .layout .map-panel {
+    width: 100%;
+  }
+  .sidebar:not(.is-expanded) {
+    inset: auto 80px 16px 16px;
+    width: auto;
+    height: auto;
+    max-height: none;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .sidebar:not(.is-expanded) > :not(.bottom) {
+    display: none !important;
+  }
+  .sidebar:not(.is-expanded) .bottom {
+    display: block;
+    pointer-events: auto;
+  }
+  .sidebar:not(.is-expanded) .bottom p {
+    display: none;
+  }
+  .sidebar:not(.is-expanded) .primary {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 14px;
+    box-shadow: 0 4px 18px #123d4b24;
+  }
+  .recenter {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+  }
+  .location-panel {
+    top: 12px;
+    bottom: auto;
+    left: 12px;
+    width: auto;
+    max-width: calc(100% - 24px);
+    padding: 2px 10px;
+    border-radius: 28px;
+    background: #fffffff5;
+  }
+  .location-panel .status {
+    gap: 6px;
+  }
+  .location-panel .status-copy,
+  .location-panel .tracking-controls {
+    display: none;
+  }
+  .location-panel .status-dot {
+    margin-left: 6px;
+  }
+  .location-panel #locate {
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+  }
+  .location-panel.is-open {
+    width: calc(100% - 24px);
+    max-width: 360px;
+    padding: 16px;
+    border-radius: 18px;
+  }
+  .location-panel.is-open .status {
+    flex-wrap: wrap;
+  }
+  .location-panel.is-open .status-dot {
+    display: none;
+  }
+  .location-panel.is-open .status-copy {
+    display: block;
+    flex-basis: 100%;
+    padding-right: 34px;
+  }
+  .location-panel.is-open .status-copy strong {
+    font-size: 13px;
+  }
+  .location-panel.is-open .status-copy small {
+    display: block;
+    font-size: 12px;
+  }
+  .location-panel.is-open .tracking-controls {
+    display: flex;
+  }
+  .location-panel.is-open .tracking-controls small {
+    display: block;
+    font-size: 11px;
+  }
+  .location-panel.is-open .location-close {
+    display: inline-flex;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+  .map-notice {
+    top: 76px;
   }
 }

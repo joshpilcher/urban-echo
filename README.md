@@ -23,16 +23,18 @@ Use `http://localhost:8000/` on the same computer. A phone needs an **HTTPS** de
 - Discovery states: GPS required; locked beyond 100 m; checking GPS if the accuracy estimate crosses the boundary; unlocked when distance + accuracy is at most 100 m.
 - Memory creation requires a fresh fix with accuracy at most 100 m. Saving uses the latest GPS coordinates, never the map centre. The form shows the changing save location and preserves drafts after errors.
 - Photos are validated (JPEG/PNG/WebP, up to 10 MB), resized to at most 1600 px, and re-encoded as JPEG without retaining original EXIF metadata. Device-only photos use IndexedDB; metadata remains small. Local photos and stories can be deleted from their detail view. Clearing site data removes device memories.
-- The light map interface follows the Task 2 mock-up: serif headings, teal filters, compact Map preview and full-height Nearby list, photo detail view and a GPS preview during creation. Search and media filters work on actual saved records.
+- The light map interface follows the Task 2 mock-up: serif headings, teal filters, full mobile Map and separate full-height Nearby list, photo detail view and a GPS preview during creation. Search and media filters work on actual saved records.
 - Text memories persist under the original `urban-echo-v1` localStorage key. They remain on this browser/device only. Existing valid v0.1 records are retained. Invalid storage is not silently overwritten.
 - Public Echoes appear for other visitors after Refresh (or the 60-second foreground refresh). Contributors use an anonymous session, with creator-only row/photo writes and deletion enforced by Supabase policies. Public explicitly shares exact coordinates and content; old device memories are never automatically uploaded.
 - Local Leaflet 1.9.4 distribution and licence are in `vendor/leaflet/`. Basemap tiles still require an internet connection to OpenStreetMap. Fonts have system fallbacks. If the map script or tiles cannot load, the GPS/list workflow remains available.
 
 The proximity check is a client-side prototype rule, not access control. All local story data can be inspected in browser storage. Location accuracy is an estimate. The 100 m radius and 30 s expiry are provisional design decisions awaiting field evaluation.
 
-## Mobile cleanup (v0.3.1)
+## Map-first mobile layout (v0.3.2)
 
-Map shows one complete preview with a visible View list control. Nearby and My Echoes use the full mobile content area; Map returns to the map. The single Create Echo button replaces the duplicate mobile Add action. Larger type, 44 px controls, a persistent detail close toolbar and uncropped mobile detail photos improve reading and interaction. Short landscape screens put Map and its preview side by side. The creation dialog uses dynamic viewport height, scrollable content and a sticky close header; real iOS/Android keyboard and safe-area behaviour still require device testing.
+Map fills the mobile content area. Memories are in Nearby and My Echoes, rather than covering the map. Create floats at the bottom left, with recenter at the bottom right. The small GPS chip enables location; once a fresh fix is active, tapping it opens accuracy and Stop tracking controls. Location errors open the explanation automatically, and a good fix closes that automatic notice. The starting regional view uses zoom 13 (previously 12), and the first GPS view uses zoom 17 (previously 16). No location is requested on page load.
+
+The larger text, 44 px controls, persistent detail close toolbar and complete mobile detail photo remain from v0.3.1. The creation dialog uses dynamic viewport height, scrollable content and a sticky close header; real iOS/Android keyboard and safe-area behaviour still require device testing.
 
 ## Automated checks
 

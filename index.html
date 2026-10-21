@@ -81,7 +81,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.3.1</span
+          <span class="version">WORKING PROTOTYPE · 0.3.2</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -119,13 +119,15 @@
           <section class="location-panel" aria-label="Location controls">
             <div class="status">
               <span id="status-dot" class="status-dot"></span>
-              <div role="status">
+              <div class="status-copy" role="status">
                 <strong id="location-status">Discover what’s around you</strong
                 ><small id="location-subtitle"
                   >Enable GPS to find memories within 100 metres.</small
                 >
               </div>
-              <button id="locate" class="secondary">Enable GPS</button>
+              <button id="locate" class="secondary" aria-expanded="false">
+                Enable GPS
+              </button>
             </div>
             <div class="tracking-controls">
               <small id="fix-age"
@@ -135,6 +137,13 @@
                 Stop tracking
               </button>
             </div>
+            <button
+              id="location-close"
+              class="icon-button location-close"
+              aria-label="Close location details"
+            >
+              <svg class="icon"><use href="#icon-close" /></svg>
+            </button>
           </section>
           <p id="map-notice" class="map-notice" role="status" hidden></p>
           <button
@@ -183,7 +192,12 @@
           </p>
           <div class="bottom">
             <p id="create-hint">Enable GPS to leave a memory where you are.</p>
-            <button class="primary" id="create" disabled>
+            <button
+              class="primary"
+              id="create"
+              aria-describedby="create-hint"
+              disabled
+            >
               <svg class="icon"><use href="#icon-plus" /></svg>Create Echo
             </button>
           </div>

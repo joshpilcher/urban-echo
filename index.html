@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="theme-color" content="#f7f9fb" />
     <meta
@@ -81,7 +81,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.3</span
+          <span class="version">WORKING PROTOTYPE · 0.3.1</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -145,8 +145,8 @@
             <svg class="icon"><use href="#icon-locate" /></svg>
           </button>
           <div class="map-legend">
-            <span class="legend-dot"></span> A story is waiting here
-            <span>· 100 m to discover</span>
+            <span class="legend-dot"></span> Echo pins
+            <span>· Discover within 100 m</span>
           </div>
         </section>
         <aside class="sidebar" id="discovery" tabindex="-1">
@@ -156,12 +156,13 @@
             aria-label="Expand nearby memories"
             aria-expanded="false"
           >
-            <span></span>
+            <span class="sheet-label" id="sheet-label">View list</span
+            ><svg class="icon"><use href="#icon-list" /></svg>
           </button>
           <div class="side-head">
             <div>
               <span class="eyebrow" id="list-eyebrow">DISCOVER</span>
-              <h2 id="list-heading">Stories around you</h2>
+              <h2 id="list-heading">Nearby Echoes</h2>
             </div>
             <span class="count" id="echo-count" aria-label="Total saved Echoes"
               >0</span
@@ -325,10 +326,12 @@
       class="detail-dialog"
       aria-labelledby="detail-title"
     >
-      <div id="detail-hero" class="detail-hero">
+      <div class="detail-toolbar">
         <button id="detail-close" class="icon-button" aria-label="Close memory">
-          <svg class="icon"><use href="#icon-arrow" /></svg>
-        </button>
+          <svg class="icon"><use href="#icon-arrow" /></svg></button
+        ><span>Echo memory</span>
+      </div>
+      <div id="detail-hero" class="detail-hero">
         <div id="detail-image"></div>
       </div>
       <article class="detail-body">

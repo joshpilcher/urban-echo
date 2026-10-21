@@ -42,6 +42,14 @@
           <path d="M8 5 6 8H3v12h18V8h-3l-2-3Z" />
           <circle cx="12" cy="13.5" r="3.5" />
         </symbol>
+        <symbol id="icon-video" viewBox="0 0 24 24">
+          <rect x="3" y="5" width="12" height="14" rx="2" />
+          <path d="m15 10 6-4v12l-6-4" />
+        </symbol>
+        <symbol id="icon-audio" viewBox="0 0 24 24">
+          <rect x="9" y="2" width="6" height="12" rx="3" />
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" />
+        </symbol>
         <symbol id="icon-story" viewBox="0 0 24 24">
           <path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h5" />
         </symbol>
@@ -81,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.3.3</span
+          <span class="version">WORKING PROTOTYPE · 0.4.0</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -297,8 +305,12 @@
           where you’re standing, even if you move the map.
         </p>
         <h3 class="form-section-heading">
-          Add a photo <span class="optional">optional</span>
+          Add a memory <span class="optional">optional</span>
         </h3>
+        <p class="muted">
+          One attachment per Echo. Add a photo, record a moment or capture the
+          sounds of this place.
+        </p>
         <label class="photo-picker" for="photo"
           ><svg class="icon"><use href="#icon-camera" /></svg
           ><strong>Choose a photo</strong
@@ -319,6 +331,68 @@
           </button>
         </div>
         <p id="photo-status" class="muted" role="status"></p>
+        <div class="capture-actions" aria-label="Record a memory">
+          <button id="record-video" type="button" class="secondary">
+            <svg class="icon"><use href="#icon-video" /></svg>Record video
+          </button>
+          <button id="record-audio" type="button" class="secondary">
+            <svg class="icon"><use href="#icon-audio" /></svg>Record audio
+          </button>
+        </div>
+        <p class="muted">
+          Video: up to 30 seconds / 20 MB. Audio: up to 60 seconds / 8 MB.
+        </p>
+        <details class="clip-import">
+          <summary>Choose an existing video or audio file</summary>
+          <div class="clip-files">
+            <label for="video-file">Choose video file</label
+            ><input
+              id="video-file"
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+            />
+            <label for="audio-file">Choose audio file</label
+            ><input
+              id="audio-file"
+              type="file"
+              accept="audio/mp4,audio/x-m4a,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/webm"
+            />
+          </div>
+        </details>
+        <section
+          id="recorder"
+          class="recorder"
+          aria-label="Recording controls"
+          hidden
+        >
+          <video id="recording-live" autoplay muted playsinline hidden></video>
+          <p id="recording-status" role="status"></p>
+          <div class="capture-actions">
+            <button id="record-stop" type="button" class="secondary">
+              Stop recording</button
+            ><button id="record-cancel" type="button" class="text-button">
+              Cancel recording
+            </button>
+          </div>
+        </section>
+        <section
+          id="clip-preview"
+          class="clip-preview"
+          aria-label="Selected recording"
+          hidden
+        >
+          <div id="clip-player"></div>
+          <button id="clip-remove" type="button" class="text-button">
+            Remove recording
+          </button>
+        </section>
+        <p id="clip-status" class="muted" role="status"></p>
+        <p class="media-note">
+          Camera and microphone access starts only when you tap Record. Preview
+          before saving. Add spoken words as text in your story so others can
+          read them too. Selected audio/video files retain their original
+          metadata.
+        </p>
         <fieldset class="visibility">
           <legend>Who can see this?</legend>
           <label
@@ -347,7 +421,7 @@
           >
         </fieldset>
         <p id="sharing-explanation" class="privacy-note">
-          Your story, photo and exact pin stay in this browser.
+          Your story, attachment and exact pin stay in this browser.
         </p>
         <p id="form-error" class="validation" role="alert"></p>
         <button id="save-echo" class="primary" type="submit">
@@ -382,7 +456,7 @@
           Delete this Echo
         </button>
         <div id="delete-confirm" class="delete-confirm" hidden>
-          <p>Delete this memory and its photo? This cannot be undone.</p>
+          <p>Delete this memory and its attachment? This cannot be undone.</p>
           <button id="delete-yes" class="secondary danger">Delete Echo</button
           ><button id="delete-no" class="secondary">Keep it</button>
         </div>
@@ -403,6 +477,7 @@
     <script src="config.js"></script>
     <script src="core.js"></script>
     <script src="media.js"></script>
+    <script src="recording.js"></script>
     <script src="cloud.js"></script>
     <script src="app.js"></script>
   </body>

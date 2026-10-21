@@ -69,3 +69,42 @@ test("stored v0.1 records remain valid; malformed records are rejected", () => {
   ])
     assert.equal(Core.validEcho(record), false);
 });
+
+test("media formats select bounded video/audio types and reject unsupported input", () => {
+  const { mediaInfo } = require("../core.js");
+  assert.equal(mediaInfo("video/webm;codecs=vp8,opus").maxSeconds, 30);
+  assert.equal(mediaInfo("audio/mp4").maxSeconds, 60);
+  assert.equal(mediaInfo("audio/mpeg").extension, "mp3");
+  assert.equal(mediaInfo("text/html"), null);
+});
+
+test("recorded Echo metadata preserves old records and rejects ambiguous attachments", () => {
+  const core = require("../core.js");
+  const original = {
+    id: "test",
+    title: "Memory",
+    story: "Story",
+    lat: 0,
+    lng: 0,
+    createdAt: new Date().toISOString(),
+  };
+  assert.equal(
+    core.validEcho({ ...original, mediaKind: "audio", mediaId: "test" }),
+    true,
+  );
+  assert.equal(
+    core.validEcho({
+      ...original,
+      mediaKind: "video",
+      mediaPath: "owner/test.mp4",
+    }),
+    true,
+  );
+  for (const attachment of [
+    { mediaKind: "audio" },
+    { mediaKind: "other", mediaId: "test" },
+    { mediaId: "test" },
+    { mediaKind: "video", mediaId: "test", photoId: "test" },
+  ])
+    assert.equal(core.validEcho({ ...original, ...attachment }), false);
+});

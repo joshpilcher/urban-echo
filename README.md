@@ -2,7 +2,7 @@
 
 **[Open the live prototype](https://joshpilcher.github.io/urban-echo/)** · [Process journal](https://joshpilcher.github.io/urban-echo-process-journal/)
 
-Location-responsive mobile web app · DES222 prototype v0.3
+Location-responsive mobile web app · DES222 prototype v0.4
 
 A location-responsive DES222 mobile web prototype. The map and distance-sorted memory cards respond to device location; stories reveal when the reported position and its accuracy estimate fit inside a 100 m discovery radius.
 
@@ -14,7 +14,7 @@ No build step is needed. Serve the repository root:
 python3 -m http.server 8000
 ```
 
-Use `http://localhost:8000/` on the same computer. A phone needs an **HTTPS** deployment; opening an HTTP LAN address usually cannot access geolocation. The app asks for location only after Enable GPS is pressed. It has no background tracking. Public photo sharing uses a dedicated Supabase project; see [backend setup and limits](backend/README.md).
+Use `http://localhost:8000/` on the same computer. A phone needs an **HTTPS** deployment; opening an HTTP LAN address usually cannot access geolocation. The app asks for location only after Enable GPS is pressed. It has no background tracking. Public media sharing uses a dedicated Supabase project; see [backend setup and limits](backend/README.md).
 
 ## Current behaviour
 
@@ -29,6 +29,14 @@ Use `http://localhost:8000/` on the same computer. A phone needs an **HTTPS** de
 - Local Leaflet 1.9.4 distribution and licence are in `vendor/leaflet/`. Basemap tiles still require an internet connection to OpenStreetMap. Fonts have system fallbacks. If the map script or tiles cannot load, the GPS/list workflow remains available.
 
 The proximity check is a client-side prototype rule, not access control. All local story data can be inspected in browser storage. Location accuracy is an estimate. The 100 m radius and 30 s expiry are provisional design decisions awaiting field evaluation.
+
+## Audio and video memories (v0.4.0)
+
+Create supports one optional attachment: photo, video or audio. Record video (rear camera preferred, including microphone) up to 30 seconds / 20 MB, or audio up to 60 seconds / 8 MB. Explicit record buttons request permission; a live video preview/timer and Stop/Cancel controls remain available. The recorder selects a browser-supported MP4/WebM/Ogg format. Devices stop on completion, cancellation, interruption, dialog close, page hide and a late permission response after cancellation. Existing attachments remain until a replacement has prepared successfully.
+
+An expandable file chooser provides MP4/WebM/QuickTime video and M4A/MP3/WAV/Ogg/WebM audio fallback. Files must pass type, size, readable duration and browser metadata checks; codec support still varies. There is no transcoding service. Imported files retain original metadata; photos retain their existing JPEG re-encoding. Add spoken words to the required story text for a readable alternative; automatic captions/transcription are not implemented.
+
+Preview before saving. Device-only clips use the existing IndexedDB store (the legacy `photos` store name is retained for compatibility); only small metadata enters localStorage. Public clips use the separate `urban-echo-recordings` bucket. Echo details provide native playback controls without autoplay. GPS refreshes preserve playback; moving out of range, stopping GPS or closing details stops playback. Map/list show media icons and do not pre-download recordings. Public media URLs remain public, regardless of the in-app proximity state.
 
 ## Map-first mobile layout (v0.3.3)
 
@@ -49,11 +57,15 @@ npm run test:browser
 ECHO_TEST_OFFLINE=1 npm run test:browser
 # Explicit live-service test: creates two anonymous sessions and deletes its test Echo/photo
 npm run test:shared
+# Synthetic camera/microphone + real browser encoding; device-only
+npm run test:media
+# Explicit real backend verification for audio/video (test rows/files removed)
+npm run test:shared-media
 ```
 
 Both browser runners start and stop their own local HTTP servers. The regular regression runner injects empty cloud configuration to keep its cases device-only; the separate shared runner uses the configured real Supabase service. `CHROMIUM_PATH` can select an existing Chromium executable. It uses `HTTPS_PROXY` when set. In this work environment the standard browser download was unavailable, so the checks used a separately installed Chromium 133 binary with Playwright 1.62.1. The binary is not part of this repository. That older browser also required `PW_TEST_SCREENSHOT_NO_FONTS_READY=1` for screenshot capture because its font-ready wait could stall; this affects the test capture only.
 
-Thirteen Node checks cover the location rules and shared-storage adapter contracts using a fake SDK. These do not validate live database policies. Twenty-one browser checks use synthetic coordinates/content and an overridden browser geolocation provider. They cover permissions/retry, temporary errors, creation, persistence, movement, uncertainty, stopping, stale fixes, storage failures, text-only tooltips, responsive sizing, map-script failure, photo validation/resizing, IndexedDB persistence, deletion and live photo relocking. Mobile checks also cover 320 × 568, 390 × 844, 430 × 932 and 844 × 390 viewports, reachable list cards and create/close controls, navigation state, title search and a reduced-height form viewport. These are browser layout simulations rather than physical keyboard or phone tests. Optional Google Fonts are disabled in the browser runner to make screenshot capture independent of that network service; the app’s system-font fallbacks are used. Screenshots are regenerated in `test-results/screenshots/` and visibly labelled **SIMULATED GPS · BROWSER TEST**. They do not prove actual phone GPS performance.
+Twenty-three Node checks cover the location rules and shared-storage adapter contracts using a fake SDK. These do not validate live database policies. Twenty-one browser checks use synthetic coordinates/content and an overridden browser geolocation provider. They cover permissions/retry, temporary errors, creation, persistence, movement, uncertainty, stopping, stale fixes, storage failures, text-only tooltips, responsive sizing, map-script failure, photo validation/resizing, IndexedDB persistence, deletion and live photo relocking. Mobile checks also cover 320 × 568, 390 × 844, 430 × 932 and 844 × 390 viewports, reachable list cards and create/close controls, navigation state, title search and a reduced-height form viewport. These are browser layout simulations rather than physical keyboard or phone tests. Optional Google Fonts are disabled in the browser runner to make screenshot capture independent of that network service; the app’s system-font fallbacks are used. Screenshots are regenerated in `test-results/screenshots/` and visibly labelled **SIMULATED GPS · BROWSER TEST**. They do not prove actual phone GPS performance.
 
 ## Physical-phone test still needed
 
@@ -75,3 +87,7 @@ Seven live shared-storage checks passed using two independent anonymous browser 
 ## Next increments
 
 Field-test the core loop and camera/photo flow on phones, review the 100 m / 30 s decisions, and record the required standalone 1–3 minute showreel. Anonymous ownership has no recovery after site data is cleared; moderation, account recovery and pagination beyond the newest 200 public Echoes remain future work. Anonymous sign-up keeps the service's default rate limits; CAPTCHA abuse protection is not configured for the prototype.
+
+The media browser runner uses Chromium’s synthetic camera/microphone with the real MediaRecorder API. Local checks cover permission denial, unavailable recording, camera close cleanup, file validation/duration, responsive removal controls, audio/video recording and preview, IndexedDB persistence after reload, actual playback, identity across GPS refreshes, relocking, deletion and uncaught errors. The explicit shared variant additionally checks a second anonymous session, real Storage playback, cross-owner row/object write protection and creator cleanup. These tests do not establish physical iOS Safari/Android camera/microphone behaviour. Use real phones before recording the showreel.
+
+Verified this increment: **23 Node, 21 existing regression, 12 local media and 9 real shared-media browser checks passed.** A database/storage read-back confirmed zero synthetic recording rows and zero recording objects after cleanup. Anonymous test Auth accounts remain; these are not participants.

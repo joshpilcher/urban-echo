@@ -25,3 +25,13 @@ Photo upload and row creation are separate operations. A failed insert is reconc
 ## Dependencies
 
 The official Supabase JavaScript SDK 2.118.0 and its MIT licence are vendored in `vendor/supabase/`. No build system or server secret is needed on GitHub Pages.
+
+## Audio/video extension — 21 October 2026
+
+Applied additive migration `urban_echo_audio_video_memories`; `recordings.sql` contains the upgrade after `schema.sql`. It adds nullable `media_kind`/`media_path` columns and a constraint requiring audio/video, a creator-scoped path/known extension, and no simultaneous photo. Existing rows, the JPEG bucket and its limit are unchanged. Recordings have a separate public `urban-echo-recordings` bucket with a 20 MiB limit and an explicit MIME allowlist. INSERT/SELECT/DELETE policies scope object management to the current anonymous creator’s folder; no UPDATE/upsert permission is added. The existing table RLS and least-privilege grants cover the new columns.
+
+The browser limits audio to 8 MiB / 60 seconds and video to 20 MiB / 30 seconds. The bucket enforces 20 MiB/type restrictions, but duration and the stricter audio size limit are client checks, not server media inspection. There is no transcoder, content moderation, automatic transcript or universal codec guarantee. Public files are intentionally downloadable by anyone knowing their URL. Imported media is not stripped of metadata. Existing upload/reconciliation/deletion caveats apply to recordings too.
+
+A read-back query verified the new columns, CHECK constraint, bucket limits/types and all three owner policies. The security advisor reports the same categories as previously: deliberately anonymous contributor policies (now also covering recordings) and leaked-password protection disabled on the unused email/password provider. The remediation links above remain applicable. No new table without RLS was introduced. `npm run test:shared-media` explicitly runs real service verification; `npm run test:media` stays local.
+
+Nine real shared-media browser checks passed for this extension: audio and video capture/upload, reload/playback/relocking, second-session playback with cross-owner row/object deletion and upload rejection, creator removal, and no uncaught application errors. A final database/storage count confirmed zero synthetic recording rows and zero recording objects. Synthetic devices/GPS were used, and anonymous test Auth accounts remain. No field results are implied.

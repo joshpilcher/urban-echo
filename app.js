@@ -33,6 +33,11 @@
     photoPreviewURL = null,
     photoGeneration = 0,
     preparingPhoto = false;
+  let clipBlob = null,
+    clipKind = null,
+    clipPreviewURL = null,
+    clipGeneration = 0,
+    preparingClip = false;
   let saving = false,
     deleting = false,
     draftId = null,
@@ -164,6 +169,15 @@
   function hasPhoto(e) {
     return !!(e.photoId || e.photoPath);
   }
+  function mediaKind(e) {
+    return e.mediaKind || (hasPhoto(e) ? "photo" : "story");
+  }
+  function attachmentId(e) {
+    return e.mediaId || e.photoId;
+  }
+  function hasAttachment(e) {
+    return hasPhoto(e) || !!(e.mediaId || e.mediaPath);
+  }
   function owner(e) {
     return e.source !== "shared" || e.ownerId === Cloud.userId;
   }
@@ -173,17 +187,17 @@
       ":" +
       e.id +
       ":" +
-      (e.photoPath || e.photoId || "")
+      (e.mediaPath || e.mediaId || e.photoPath || e.photoId || "")
     );
   }
-  function photoURL(e) {
-    if (!hasPhoto(e)) return null;
-    if (e.source === "shared") return Cloud.photoURL(e);
+  function attachmentURL(e) {
+    if (!hasAttachment(e)) return null;
+    if (e.source === "shared") return Cloud.mediaURL(e);
     const key = photoKey(e);
     if (photos.has(key)) return photos.get(key).url;
     const entry = { url: null, ready: false };
     photos.set(key, entry);
-    Media.get(e.photoId)
+    Media.get(attachmentId(e))
       .then((blob) => {
         if (photos.get(key) !== entry) return;
         if (blob) {
@@ -226,13 +240,17 @@
         "span",
         "echo-marker " + (e.state === "unlocked" ? "is-unlocked" : "is-locked"),
       );
-      const url = e.state === "unlocked" ? photoURL(e) : null;
+      const url =
+        e.state === "unlocked" ? (hasPhoto(e) ? attachmentURL(e) : null) : null;
       if (url) {
         const image = node("img");
         image.src = url;
         image.alt = "";
         content.append(image);
-      } else content.append(icon(hasPhoto(e) ? "camera" : "story"));
+      } else
+        content.append(
+          icon(mediaKind(e) === "photo" ? "camera" : mediaKind(e)),
+        );
       const markerIcon = L.divIcon({
         className: "",
         html: content,
@@ -273,23 +291,52 @@
       { year: "numeric", month: "long", day: "numeric" },
     );
     const imageArea = $("detail-image");
-    imageArea.replaceChildren();
-    const url = e.state === "unlocked" ? photoURL(e) : null;
-    if (url) {
-      const image = node("img");
-      image.src = url;
-      image.alt = "Photo attached to “" + e.title + "”";
-      imageArea.append(image);
-    } else
-      imageArea.append(
-        icon(
-          e.state === "unlocked" ? (hasPhoto(e) ? "camera" : "story") : "lock",
-        ),
-      );
+    const kind = mediaKind(e);
+    const url = e.state === "unlocked" ? attachmentURL(e) : null;
+    const key = e.id + ":" + e.state + ":" + (url || "pending");
+    // Preserve playback position through GPS refreshes and other renders.
+    if (imageArea.dataset.mediaKey !== key) {
+      imageArea.querySelectorAll("audio,video").forEach((p) => {
+        p.pause();
+        p.removeAttribute("src");
+        p.load();
+      });
+      imageArea.replaceChildren();
+      imageArea.dataset.mediaKey = key;
+      if (url && (kind === "audio" || kind === "video")) {
+        const player = node(kind);
+        player.controls = true;
+        player.preload = "metadata";
+        player.setAttribute("playsinline", "");
+        player.setAttribute("aria-label", kind + " memory: " + e.title);
+        player.src = url;
+        const feedback = node("p", "media-feedback");
+        feedback.setAttribute("role", "status");
+        player.addEventListener("error", () => {
+          feedback.textContent =
+            "This recording could not play here. Try another browser or check your connection.";
+        });
+        imageArea.append(player, feedback);
+      } else if (url) {
+        const image = node("img");
+        image.src = url;
+        image.alt = "Photo attached to “" + e.title + "”";
+        imageArea.append(image);
+      } else
+        imageArea.append(
+          icon(
+            e.state === "unlocked"
+              ? kind === "photo"
+                ? "camera"
+                : kind
+              : "lock",
+          ),
+        );
+    }
     $("detail-notice").textContent =
       e.source === "shared"
         ? "A memory shared with everyone. In-app discovery opens within 100 metres; public content is not private."
-        : "This memory and photo stay in this browser. They are not shared with other people.";
+        : "This memory and attachment stay in this browser. They are not shared with other people.";
     $("delete-echo").hidden = !owner(e) || confirmationId === e.id;
     $("delete-confirm").hidden = confirmationId !== e.id || !owner(e);
     $("detail-close").disabled = deleting;
@@ -314,8 +361,8 @@
     const isPublic = $("visibility-public").checked;
     $("visibility-public").disabled = !Cloud.available || saving;
     $("sharing-explanation").textContent = isPublic
-      ? "Your title, story, photo and exact pin will be public. Keep this browser to manage your shared Echoes; this prototype has no account recovery."
-      : "Your story, photo and exact pin stay in this browser.";
+      ? "Your title, story, attachment and exact pin will be public. Keep this browser to manage your shared Echoes; this prototype has no account recovery."
+      : "Your story, attachment and exact pin stay in this browser.";
     $("save-echo").textContent = saving
       ? isPublic
         ? "Sharing your Echo…"
@@ -323,13 +370,23 @@
       : isPublic
         ? "Share my Echo"
         : "Save my Echo";
-    $("save-echo").disabled = saving || preparingPhoto;
+    $("save-echo").disabled =
+      saving || preparingPhoto || preparingClip || recorder.busy;
     $("title").disabled = saving;
     $("story").disabled = saving;
     $("visibility-local").disabled = saving;
     $("close").disabled = saving;
-    $("photo").disabled = saving;
-    $("photo-remove").disabled = saving;
+    $("photo").disabled = saving || preparingClip || recorder.busy;
+    for (const id of [
+      "record-video",
+      "record-audio",
+      "video-file",
+      "audio-file",
+      "clip-remove",
+    ])
+      $(id).disabled =
+        saving || preparingPhoto || preparingClip || recorder.busy;
+    $("photo-remove").disabled = saving || recorder.busy;
     if (!$("dialog").open) return;
     const ready = Core.canCreate(fix);
     $("location-badge").textContent = ready
@@ -465,7 +522,12 @@
       card.type = "button";
       card.dataset.echoId = e.id;
       const visual = node("div", "echo-visual"),
-        url = e.state === "unlocked" ? photoURL(e) : null;
+        url =
+          e.state === "unlocked"
+            ? hasPhoto(e)
+              ? attachmentURL(e)
+              : null
+            : null;
       if (url) {
         const image = node("img");
         image.src = url;
@@ -476,9 +538,9 @@
         visual.append(
           icon(
             e.state === "unlocked"
-              ? hasPhoto(e)
+              ? mediaKind(e) === "photo"
                 ? "camera"
-                : "story"
+                : mediaKind(e)
               : "lock",
           ),
         );
@@ -499,7 +561,12 @@
         node(
           "small",
           "",
-          (hasPhoto(e) ? "Photo memory" : "Written memory") +
+          {
+            photo: "Photo memory",
+            audio: "Audio memory",
+            video: "Video memory",
+            story: "Written memory",
+          }[mediaKind(e)] +
             " · " +
             (e.source === "shared" ? "Public" : "This device"),
         ),
@@ -730,15 +797,14 @@
     const file = $("photo").files?.[0];
     if (!file) return;
     const token = ++photoGeneration;
-    photoBlob = null;
     preparingPhoto = true;
-    $("photo-preview").hidden = true;
     $("photo-status").textContent = "Preparing your photo…";
     $("form-error").textContent = "";
     updateForm();
     try {
       const blob = await Media.prepare(file);
       if (token !== photoGeneration) return;
+      clearClip();
       photoBlob = blob;
       if (photoPreviewURL) URL.revokeObjectURL(photoPreviewURL);
       photoPreviewURL = URL.createObjectURL(blob);
@@ -759,6 +825,138 @@
       }
     }
   });
+  function pausePlayers(area) {
+    area.querySelectorAll("audio,video").forEach((p) => p.pause());
+  }
+  function clearClip() {
+    clipGeneration++;
+    clipBlob = null;
+    clipKind = null;
+    preparingClip = false;
+    pausePlayers($("clip-player"));
+    $("clip-player").replaceChildren();
+    $("clip-preview").hidden = true;
+    $("clip-status").textContent = "";
+    $("video-file").value = $("audio-file").value = "";
+    if (clipPreviewURL) URL.revokeObjectURL(clipPreviewURL);
+    clipPreviewURL = null;
+    updateForm();
+  }
+  async function attachClip(file, kind, duration) {
+    const token = ++clipGeneration;
+    preparingClip = true;
+    $("clip-status").textContent = "Preparing your " + kind + "…";
+    updateForm();
+    try {
+      const blob = await Media.prepareClip(file, kind, duration);
+      if (token !== clipGeneration) return;
+      clearPhoto();
+      pausePlayers($("clip-player"));
+      $("clip-player").replaceChildren();
+      if (clipPreviewURL) URL.revokeObjectURL(clipPreviewURL);
+      $("video-file").value = $("audio-file").value = "";
+      clipBlob = blob;
+      clipKind = kind;
+      clipPreviewURL = URL.createObjectURL(blob);
+      const player = node(kind);
+      player.controls = true;
+      player.preload = "metadata";
+      player.setAttribute("playsinline", "");
+      player.setAttribute("aria-label", "Selected " + kind + " preview");
+      player.src = clipPreviewURL;
+      $("clip-player").append(player);
+      $("clip-preview").hidden = false;
+      $("clip-status").textContent =
+        (kind === "audio" ? "Audio" : "Video") +
+        " ready · " +
+        (blob.size < 1024 * 1024
+          ? Math.max(1, Math.round(blob.size / 1024)) + " KB"
+          : (blob.size / 1024 / 1024).toFixed(1) + " MB") +
+        ". Preview before saving.";
+    } catch (error) {
+      if (token === clipGeneration) {
+        $(kind + "-file").value = "";
+        $("clip-status").textContent =
+          error.message +
+          (clipBlob || photoBlob
+            ? " Your previous attachment is still selected."
+            : "");
+      }
+    } finally {
+      if (token === clipGeneration) {
+        preparingClip = false;
+        updateForm();
+      }
+    }
+  }
+  let recorderState = "idle";
+  const recorder = window.EchoRecorder.create({
+    onState(state, data) {
+      const changed = recorderState !== state;
+      recorderState = state;
+      $("recorder").hidden = state === "idle";
+      if (changed && state === "recording")
+        requestAnimationFrame(() => {
+          if ($("dialog").open && recorderState === "recording") {
+            $("record-stop").focus({ preventScroll: true });
+            $("recorder").scrollIntoView({
+              block: "nearest",
+              behavior: "instant",
+            });
+          }
+        });
+      $("record-stop").hidden = state !== "recording";
+      const live = $("recording-live");
+      live.hidden = state !== "recording" || data.kind !== "video";
+      if (data.stream && live.srcObject !== data.stream) {
+        live.srcObject = data.stream;
+        live.play().catch(() => {});
+      }
+      if (state === "idle" || state === "processing") {
+        live.pause();
+        live.srcObject = null;
+      }
+      $("recording-status").textContent =
+        state === "requesting"
+          ? "Waiting for camera or microphone permission…"
+          : state === "processing"
+            ? "Finishing your recording…"
+            : "Recording " +
+              (data.kind || "") +
+              " · " +
+              (data.seconds || 0) +
+              " / " +
+              (data.limit || 0) +
+              " seconds";
+      updateForm();
+    },
+    onReady: attachClip,
+    onError(error) {
+      $("clip-status").textContent = error.message;
+      updateForm();
+    },
+  });
+  for (const kind of ["audio", "video"]) {
+    $("record-" + kind).addEventListener("click", () => {
+      pausePlayers($("clip-player"));
+      $("clip-status").textContent = "";
+      recorder.start(kind);
+    });
+    $(kind + "-file").addEventListener("change", () => {
+      const file = $(kind + "-file").files?.[0];
+      if (file) attachClip(file, kind);
+    });
+  }
+  $("record-stop").addEventListener("click", recorder.stop);
+  $("record-cancel").addEventListener("click", recorder.cancel);
+  $("clip-remove").addEventListener("click", clearClip);
+  $("dialog").addEventListener("close", () => {
+    recorder.cancel();
+    pausePlayers($("clip-player"));
+  });
+  $("detail-dialog").addEventListener("close", () =>
+    pausePlayers($("detail-image")),
+  );
   $("photo-remove").addEventListener("click", clearPhoto);
   $("title").addEventListener("input", updateForm);
   $("story").addEventListener("input", updateForm);
@@ -867,7 +1065,7 @@
   });
   $("echo-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (saving || preparingPhoto) return;
+    if (saving || preparingPhoto || preparingClip || recorder.busy) return;
     $("form-error").textContent = "";
     if (!Core.canCreate(fix)) {
       $("form-error").textContent =
@@ -891,12 +1089,14 @@
       createdAt: new Date().toISOString(),
     };
     const selectedPhoto = photoBlob;
+    const selectedClip = clipBlob;
+    if (selectedClip) item.mediaKind = clipKind;
     let storedPhoto = false;
     saving = true;
     updateForm();
     try {
       if (isPublic) {
-        const saved = await Cloud.create(item, selectedPhoto);
+        const saved = await Cloud.create(item, selectedClip || selectedPhoto);
         sharedEchoes = [
           saved,
           ...sharedEchoes.filter((e) => e.id !== saved.id),
@@ -904,9 +1104,10 @@
       } else {
         readEchoes();
         if (storageProblem) throw new Error(storageProblem);
-        if (selectedPhoto) {
-          await Media.put(item.id, selectedPhoto);
-          item.photoId = item.id;
+        if (selectedClip || selectedPhoto) {
+          await Media.put(item.id, selectedClip || selectedPhoto);
+          if (selectedClip) item.mediaId = item.id;
+          else item.photoId = item.id;
           storedPhoto = true;
         }
         const next = [item, ...echoes];
@@ -922,6 +1123,7 @@
       }
       $("echo-form").reset();
       clearPhoto();
+      clearClip();
       draftId = null;
       $("dialog").close();
       mineOnly = false;
@@ -979,7 +1181,8 @@
           );
         }
         echoes = next;
-        if (e.photoId) await Media.remove(e.photoId).catch(() => {});
+        if (attachmentId(e))
+          await Media.remove(attachmentId(e)).catch(() => {});
       }
       const cached = photos.get(photoKey(e));
       if (cached?.url) URL.revokeObjectURL(cached.url);
@@ -1001,6 +1204,9 @@
     }
   });
   window.addEventListener("pagehide", () => {
+    recorder.cancel();
+    pausePlayers($("clip-player"));
+    pausePlayers($("detail-image"));
     stopTracking();
     for (const entry of photos.values())
       if (entry.url) URL.revokeObjectURL(entry.url);
@@ -1010,6 +1216,11 @@
     if (event.persisted) render();
   });
   document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      recorder.cancel();
+      pausePlayers($("clip-player"));
+      pausePlayers($("detail-image"));
+    }
     if (!document.hidden) {
       if (fix && !Core.freshFix(fix)) {
         invalidateFix();

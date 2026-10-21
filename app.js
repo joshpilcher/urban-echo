@@ -255,12 +255,11 @@
       if (!pin) {
         pin = L.marker([e.lat, e.lng], {
           icon: markerIcon,
-          title: e.title,
+          alt: e.title,
         }).addTo(map);
         pin.on("click", () => openDetail(e.id));
         pins.set(e.id, pin);
       } else pin.setIcon(markerIcon);
-      pin.bindTooltip(node("span", "", e.title));
     });
   }
   function drawDetail() {
@@ -420,7 +419,6 @@
     const e = allRecords().find((e) => e.id === id);
     if (map && e) {
       map.stop().flyTo([e.lat, e.lng], 17, { animate: !reducedMotion });
-      pins.get(id)?.openTooltip();
     }
   }
   function updateForm() {

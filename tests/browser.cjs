@@ -289,7 +289,7 @@ async function main() {
       },
     );
     await check(
-      "HTML in user title renders as text in both card and Leaflet tooltip",
+      "Echo titles remain literal text without floating map title labels",
       async () => {
         await page.locator("#locate").click();
         await emit(point);
@@ -301,11 +301,12 @@ async function main() {
         await page.locator(".echo").first().click();
         assert.equal(await page.locator(".leaflet-tooltip img").count(), 0);
         assert.equal(await page.evaluate(() => window.injected), undefined);
-        assert.match(
-          await page.locator(".leaflet-tooltip").textContent(),
-          /<img/,
-        );
+        assert.equal(await page.locator(".leaflet-tooltip").count(), 0);
+        assert.match(await page.locator("#detail-title").textContent(), /<img/);
         await page.locator("#detail-close").click();
+        await page.locator("#nav-map").click();
+        assert.equal(await page.locator(".leaflet-tooltip").count(), 0);
+        assert.equal(await page.locator(".leaflet-marker-icon[title]").count(), 0);
       },
     );
     await check(

@@ -81,7 +81,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.3.2</span
+          <span class="version">WORKING PROTOTYPE · 0.3.3</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -92,17 +92,6 @@
           </button>
         </div>
       </header>
-      <div class="explore-toolbar">
-        <div class="category-filters" role="group" aria-label="Memory type">
-          <button data-kind="all" aria-pressed="true">All</button
-          ><button data-kind="photo" aria-pressed="false">Photos</button
-          ><button data-kind="story" aria-pressed="false">Stories</button>
-        </div>
-        <p class="community-state" id="community-status" role="status">
-          Your places. Your memories.
-        </p>
-        <button class="text-button" id="refresh-shared" hidden>Refresh</button>
-      </div>
       <div class="search-bar" id="search-bar" hidden>
         <label class="sr-only" for="search">Search memory titles</label
         ><svg class="icon"><use href="#icon-search" /></svg
@@ -116,6 +105,37 @@
       <main class="layout">
         <section class="map-panel" aria-label="Interactive Echo map">
           <div id="map" aria-label="Map showing your location and Echoes"></div>
+          <section class="map-discovery" aria-label="Explore nearby memories">
+            <button
+              id="map-discovery-link"
+              class="discovery-link"
+              type="button"
+            >
+              <span class="discovery-heading"
+                ><strong id="map-discovery-title">Find a story nearby</strong
+                ><span class="discovery-arrow" aria-hidden="true">→</span></span
+              >
+              <span id="map-discovery-copy"
+                >Enable GPS to discover memories around you.</span
+              >
+            </button>
+            <button
+              class="icon-button"
+              id="refresh-shared"
+              aria-label="Refresh shared Echoes"
+              title="Refresh shared Echoes"
+              hidden
+            >
+              <svg class="icon" viewBox="0 0 24 24">
+                <path
+                  d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 17.9 17"
+                />
+              </svg>
+            </button>
+            <p class="sr-only" id="community-status" role="status">
+              Your places. Your memories.
+            </p>
+          </section>
           <section class="location-panel" aria-label="Location controls">
             <div class="status">
               <span id="status-dot" class="status-dot"></span>

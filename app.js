@@ -24,7 +24,6 @@
     sharedEchoes = [],
     storageProblem = "",
     filter = "all",
-    kind = "all",
     mineOnly = false;
   let selectedId = null,
     confirmationId = null,
@@ -384,11 +383,32 @@
         (newlyUnlocked.length === 1 ? " is" : "es are") +
         " now within reach.";
     previousUnlocked = new Set(unlocked.map((e) => e.id));
+    $("map-discovery-title").textContent = sharedError
+      ? "Shared Echoes unavailable"
+      : !Core.freshFix(fix)
+        ? "Find a story nearby"
+        : !Core.canCreate(fix)
+          ? "Finding your place"
+          : unlocked.length
+            ? unlocked.length +
+              " Echo" +
+              (unlocked.length === 1 ? "" : "es") +
+              " within reach"
+            : "No Echoes within reach";
+    $("map-discovery-copy").textContent = sharedError
+      ? "Device memories still work. Use Refresh to retry."
+      : !Core.freshFix(fix)
+        ? "Enable GPS to discover memories around you."
+        : !Core.canCreate(fix)
+          ? "Wait for a clearer GPS reading to reveal memories."
+          : unlocked.length
+            ? "Tap to explore the memories around you."
+            : "Leave a memory here, or open Nearby to explore.";
+
     const query = $("search").value.trim().toLocaleLowerCase();
     const filtered = records.filter(
       (e) =>
         (!mineOnly || owner(e)) &&
-        (kind === "all" || (kind === "photo" ? hasPhoto(e) : !hasPhoto(e))) &&
         (!query || e.title.toLocaleLowerCase().includes(query)),
     );
     const visible =
@@ -414,14 +434,6 @@
       "aria-pressed",
       String(filter === "unlocked"),
     );
-    document
-      .querySelectorAll("[data-kind]")
-      .forEach((button) =>
-        button.setAttribute(
-          "aria-pressed",
-          String(button.dataset.kind === kind),
-        ),
-      );
     const list = $("echo-list"),
       scroll = list.scrollTop;
     list.replaceChildren();
@@ -790,12 +802,6 @@
     filter = "unlocked";
     render();
   });
-  document.querySelectorAll("[data-kind]").forEach((button) =>
-    button.addEventListener("click", () => {
-      kind = button.dataset.kind;
-      render();
-    }),
-  );
   function navigation(id, expanded, mine = false) {
     mineOnly = mine;
     $("discovery").classList.toggle("is-expanded", expanded);
@@ -815,6 +821,13 @@
     event.preventDefault();
     navigation("nav-nearby", true);
     $("discovery").focus({ preventScroll: true });
+  });
+  $("map-discovery-link").addEventListener("click", () => {
+    $("search").value = "";
+    filter = allRecords().some((e) => e.state === "unlocked")
+      ? "unlocked"
+      : "all";
+    navigation("nav-nearby", true);
   });
   $("nav-map").addEventListener("click", () => navigation("nav-map", false));
   $("nav-nearby").addEventListener("click", () =>
@@ -913,7 +926,6 @@
       $("dialog").close();
       mineOnly = false;
       filter = "all";
-      kind = "all";
       $("search").value = "";
       toast(
         isPublic

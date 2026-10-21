@@ -2051,3 +2051,8 @@ textarea::placeholder {
 .activity-echo { border:0; padding:6px 0; background:transparent; color:#163640; text-align:left; font:700 1.15rem Georgia,serif; min-height:44px; overflow-wrap:anywhere; }
 .echo-social button,.reply-delete { min-height:44px; }
 @media(min-width:800px) { .activity-view { padding:32px max(28px,calc((100% - 700px)/2)); } }
+
+/* The creation preview uses the same audio card as the revealed memory. */
+.draft-attachment.draft-audio { border: 0; padding: 12px; border-radius: 20px; background: #eff2f8; }
+.draft-audio .media-feedback { margin: 8px 4px 0; font-size: 12px; color: #657687; }
+.draft-audio > .text-button { margin-top: 4px; }

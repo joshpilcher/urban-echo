@@ -272,6 +272,26 @@ async function main() {
           });
           await a.locator("#clip-preview").waitFor({ state: "visible" });
           assert.equal(await a.locator("#clip-player audio").count(), 1);
+          await a.waitForFunction(() => document.querySelector("#clip-player .wave-bars")?.dataset.ready === "true");
+          const preview = a.locator("#clip-player .echo-audio");
+          assert.equal(await preview.locator(".wave-bars span").count(), 48);
+          assert.equal(await a.locator("#clip-player audio").evaluate(p => p.controls), false);
+          await preview.locator(".audio-toggle").click();
+          await a.waitForFunction(() => !document.querySelector("#clip-player audio").paused);
+          await preview.locator(".audio-toggle").click();
+          assert.equal(await a.locator("#clip-player audio").evaluate(p => p.paused), true);
+          await preview.locator(".wave-range").focus();
+          await a.keyboard.press("Home");
+          await a.keyboard.press("ArrowRight");
+          assert.ok(await a.locator("#clip-player audio").evaluate(p => p.currentTime > 0));
+          await a.setViewportSize({width:320,height:568});
+          assert.ok(await preview.evaluate(p => p.scrollWidth <= p.clientWidth + 1));
+          assert.ok((await preview.locator(".audio-toggle").boundingBox()).height >= 44);
+          await a.locator("#clip-player .draft-audio").scrollIntoViewIfNeeded();
+          await fs.mkdir(path.join(root,"test-results/screenshots"),{recursive:true});
+          await a.screenshot({path:path.join(root,"test-results/screenshots/iteration-14-create-audio.png")});
+          await a.setViewportSize({width:390,height:844});
+
           await a.locator("#photo").setInputFiles({
             name: "bad.jpg",
             mimeType: "image/jpeg",

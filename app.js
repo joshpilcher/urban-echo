@@ -883,6 +883,7 @@
   }
   function renderDraftAttachments() {
     for (const id of ["photo-items", "clip-player"]) {
+      disposeAudioPlayers($(id));
       pausePlayers($(id));
       $(id).replaceChildren();
     }
@@ -914,13 +915,26 @@
       if (kind !== "photo" && !$("clip-player").children.length)
         remove.id = "clip-remove";
       remove.addEventListener("click", () => {
+        disposeAudioPlayers(area);
         pausePlayers(area);
         URL.revokeObjectURL(url);
         draftAttachments = draftAttachments.filter((a) => a.id !== id);
         renderDraftAttachments();
         updateForm();
       });
-      area.append(player, remove);
+      player.addEventListener("play", () => {
+        $("clip-player").querySelectorAll("audio,video").forEach(other => {
+          if (other !== player) other.pause();
+        });
+      });
+      if (kind === "audio" && window.EchoAudio) {
+        area.classList.add("audio-memory", "draft-audio");
+        const heading = node("div", "audio-heading");
+        heading.append(icon("audio"), node("strong", "", "Audio memory " + totals.audio));
+        const feedback = node("p", "media-feedback");
+        feedback.setAttribute("role", "status");
+        area.append(heading, window.EchoAudio.create(player, "audio preview " + totals.audio, feedback), feedback, remove);
+      } else area.append(player, remove);
       $(kind === "photo" ? "photo-items" : "clip-player").append(area);
     }
     $("photo-preview").hidden = !totals.photo;
@@ -1356,6 +1370,7 @@
   });
   window.addEventListener("pagehide", () => {
     recorder.cancel();
+    disposeAudioPlayers($("clip-player"));
     pausePlayers($("clip-player"));
     disposeAudioPlayers($("detail-dialog"));
     pausePlayers($("detail-dialog"));

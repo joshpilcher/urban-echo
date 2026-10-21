@@ -1808,3 +1808,118 @@ textarea::placeholder {
     top: 76px;
   }
 }
+
+/* A small, live discovery prompt replaces the filter toolbar. */
+.app {
+  grid-template-rows: 84px minmax(0, 1fr) 70px;
+}
+.app:has(.search-bar:not([hidden])) {
+  grid-template-rows: 84px 52px minmax(0, 1fr) 70px;
+}
+.map-discovery {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  max-width: 440px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffffed;
+  border: 1px solid #dce7eb;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px #24485810;
+}
+.discovery-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  min-height: 54px;
+  flex: 1;
+  min-width: 0;
+  border-radius: 6px;
+}
+.discovery-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.discovery-heading strong {
+  font: 700 23px/1.15 var(--serif);
+  letter-spacing: -0.3px;
+}
+.discovery-arrow {
+  color: var(--teal);
+  font-size: 22px;
+}
+.discovery-link > span:last-child {
+  display: block;
+  margin-top: 6px;
+  color: #637b87;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.map-discovery .icon-button {
+  background: #f0f7f7;
+  color: var(--teal);
+}
+.location-panel {
+  top: 132px;
+}
+.map-notice {
+  top: 260px;
+}
+@media (max-width: 900px) {
+  .app {
+    grid-template-rows: calc(60px + env(safe-area-inset-top)) minmax(
+        0,
+        1fr
+      ) calc(68px + env(safe-area-inset-bottom));
+  }
+  .app:has(.search-bar:not([hidden])) {
+    grid-template-rows: calc(60px + env(safe-area-inset-top)) 54px minmax(
+        0,
+        1fr
+      ) calc(68px + env(safe-area-inset-bottom));
+  }
+  .map-discovery {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    padding: 12px 14px;
+    gap: 12px;
+    border-radius: 18px;
+  }
+  .discovery-heading strong {
+    font-size: 22px;
+  }
+  .location-panel,
+  .location-panel.is-open {
+    top: auto;
+    bottom: 80px;
+    z-index: 600;
+  }
+  .map-notice {
+    top: 116px;
+  }
+}
+@media (max-width: 900px) and (max-height: 650px) {
+  .app {
+    grid-template-rows: calc(54px + env(safe-area-inset-top)) minmax(
+        0,
+        1fr
+      ) calc(60px + env(safe-area-inset-bottom));
+  }
+  .app:has(.search-bar:not([hidden])) {
+    grid-template-rows: calc(54px + env(safe-area-inset-top)) 50px minmax(
+        0,
+        1fr
+      ) calc(60px + env(safe-area-inset-bottom));
+  }
+}

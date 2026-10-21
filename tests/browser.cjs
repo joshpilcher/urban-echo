@@ -144,6 +144,8 @@ async function main() {
     };
     await check("no implicit GPS prompt and empty browser state", async () => {
       assert.equal(await page.evaluate(() => __gps.started), 0);
+      assert.equal(await page.locator("[data-kind]").count(), 0);
+      assert.match(await text("#map-discovery-title"), /Find a story/);
       assert.ok(
         await page
           .locator(".leaflet-tile")
@@ -405,7 +407,7 @@ async function main() {
         await page.screenshot({
           path: path.join(
             root,
-            "test-results/screenshots/iteration-06-photo-create.png",
+            "test-results/screenshots/iteration-07-photo-create.png",
           ),
         });
         await page.locator("#photo-test-label").evaluate((el) => el.remove());
@@ -451,7 +453,7 @@ async function main() {
         await page.screenshot({
           path: path.join(
             root,
-            "test-results/screenshots/iteration-06-photo-detail.png",
+            "test-results/screenshots/iteration-07-photo-detail.png",
           ),
         });
         await page.locator("#photo-test-label").evaluate((el) => el.remove());
@@ -557,6 +559,38 @@ async function main() {
       );
     }, fixtures);
     await check(
+      "map discovery prompt responds to GPS and opens the matching Nearby view",
+      async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.locator("#nav-map").click();
+        await emit(point);
+        assert.match(await text("#map-discovery-title"), /within reach/);
+        await page.locator("#map-discovery-link").click();
+        assert.equal(
+          await page.locator("#nav-nearby").getAttribute("aria-current"),
+          "page",
+        );
+        assert.equal(
+          await page.locator("#filter-unlocked").getAttribute("aria-pressed"),
+          "true",
+        );
+        await page.locator("#filter-all").click();
+        await page.locator("#nav-map").click();
+        await emit({ ...point, latitude: point.latitude + 0.02 });
+        assert.match(
+          await text("#map-discovery-title"),
+          /No Echoes within reach/,
+        );
+        await page.locator("#map-discovery-link").click();
+        assert.equal(
+          await page.locator("#filter-all").getAttribute("aria-pressed"),
+          "true",
+        );
+        await page.locator("#nav-map").click();
+        await emit(point);
+      },
+    );
+    await check(
       "phone map fills its content area and compact controls stay separate at all sizes",
       async () => {
         for (const size of [
@@ -579,7 +613,8 @@ async function main() {
               gps = document
                 .querySelector(".location-panel")
                 .getBoundingClientRect(),
-              recenter = r("recenter");
+              recenter = r("recenter"),
+              prompt = r("map-discovery-link");
             return {
               pageFits:
                 document.documentElement.scrollWidth <= innerWidth &&
@@ -587,6 +622,7 @@ async function main() {
               mapFills:
                 map.width >= layout.width - 1 &&
                 map.height >= layout.height - 1,
+              promptFits: prompt.top >= map.top && prompt.bottom < gps.top,
               compactGPS: gps.height <= 52,
               createFits: create.top >= map.top && create.bottom <= map.bottom,
               recenterSeparate:
@@ -598,6 +634,7 @@ async function main() {
             "pageFits",
             "mapFills",
             "compactGPS",
+            "promptFits",
             "createFits",
             "recenterSeparate",
           ])
@@ -723,20 +760,20 @@ async function main() {
         );
     await emit(point);
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-06-mobile.png"),
+      path: path.join(root, "test-results/screenshots/iteration-07-mobile.png"),
       fullPage: true,
     });
     await page.locator("#locate").click();
     await page.screenshot({
       path: path.join(
         root,
-        "test-results/screenshots/iteration-06-location-details.png",
+        "test-results/screenshots/iteration-07-location-details.png",
       ),
     });
     await page.locator("#location-close").click();
     await page.locator("#nav-nearby").click();
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-06-nearby.png"),
+      path: path.join(root, "test-results/screenshots/iteration-07-nearby.png"),
     });
     await page.locator("#nav-map").click();
     await page.locator("#create").click();
@@ -752,7 +789,7 @@ async function main() {
       dialog.prepend(note);
     });
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-06-create.png"),
+      path: path.join(root, "test-results/screenshots/iteration-07-create.png"),
       fullPage: false,
     });
     await page.locator("#dialog-test-banner").evaluate((el) => el.remove());
@@ -784,7 +821,7 @@ async function main() {
     await page.screenshot({
       path: path.join(
         root,
-        "test-results/screenshots/iteration-06-desktop.png",
+        "test-results/screenshots/iteration-07-desktop.png",
       ),
       fullPage: true,
     });

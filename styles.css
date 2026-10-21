@@ -2027,3 +2027,27 @@ textarea::placeholder {
 .audio-player .media-feedback { margin: 8px 4px 0; }
 .audio-toggle:focus-visible { outline: 3px solid #4979b5; outline-offset: 3px; }
 @media (max-width: 360px) { .echo-audio { gap: 8px; } .audio-toggle { flex-basis: 52px; width: 52px; height: 52px; } .audio-time { font-size: 11px; } }
+
+/* Social detail and the Activity destination share the story's quiet hierarchy. */
+.echo-social { margin: 28px 0 20px; padding-top: 24px; border-top: 1px solid #dfe8ed; }
+.social-actions,.activity-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.social-actions { margin-bottom:24px; }
+#echo-like[aria-pressed="true"] { background:#e8f4f3; color:#0b727b; border-color:#0b727b; }
+#echo-social h3 { margin:0 0 16px; }
+.reply-card { padding:16px 0; border-bottom:1px solid #e5ebef; }
+.reply-author { display:block; font-size:.88rem; }
+.reply-date { display:block; font-size:.75rem; color:#748897; margin-top:5px; }
+.reply-text { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; margin:10px 0; }
+#reply-form { display:grid; gap:10px; margin-top:22px; }
+#reply-form label { font-weight:700; }
+#reply-body { width:100%; min-height:100px; resize:vertical; border:1px solid #cbd9df; border-radius:14px; padding:14px; font:inherit; box-sizing:border-box; }
+#reply-form small { color:#748897; }
+#reply-submit { justify-self:end; min-height:44px; padding:12px 22px; }
+.activity-view { position:absolute; inset:0 0 76px; z-index:700; overflow-y:auto; background:#f7fafb; padding:26px 22px 32px; }
+.activity-heading h2 { margin:4px 0 12px; font-family:Georgia,serif; font-size:2rem; }
+.activity-card { position:relative; margin-top:14px; background:white; border:1px solid #e1e9ec; border-radius:20px; padding:20px 18px 20px 52px; }
+.activity-symbol { position:absolute; left:19px; top:22px; color:#0c7580; font-size:1.25rem; }
+.activity-copy { font-size:.86rem; color:#5a7380; margin:0 0 6px; }
+.activity-echo { border:0; padding:6px 0; background:transparent; color:#163640; text-align:left; font:700 1.15rem Georgia,serif; min-height:44px; overflow-wrap:anywhere; }
+.echo-social button,.reply-delete { min-height:44px; }
+@media(min-width:800px) { .activity-view { padding:32px max(28px,calc((100% - 700px)/2)); } }

@@ -117,3 +117,11 @@ The Echo title, description and date now lead the detail view. Audio cards follo
 Audio uses a large teal play/pause button, a seekable waveform and elapsed/total time. Wave heights are calculated from decoded samples across all channels using OfflineAudioContext, with no microphone request or autoplay. Keyboard arrow keys and touch can seek. Decoding is bounded to the existing 8 MiB / 60-second audio limits. If decoding is unavailable, the row shows a flat line and an explanation while playback remains available; normal media metadata supplies duration when possible. A browser that cannot decode WebM or report its duration may have limited seeking until metadata becomes available.
 
 Only one recording plays at a time. Valid GPS refreshes retain playback, while Close, Escape, foreground exit and relocking pause it. Disposing a card aborts its pending waveform fetch. Storage, attachment limits and backend policies are unchanged. Automated coverage includes waveform decoding from real shared Storage, button playback/pause, keyboard seeking, decoding fallback and mobile layout. Physical iOS/Android testing is still required.
+
+## Likes, replies and Activity (v0.6.0)
+
+Public Echoes now support one like per anonymous browser identity and short replies up to 500 characters. Interaction controls appear only when a shared Echo is unlocked within the GPS reveal radius. Likes can be toggled; reply authors can delete their own replies. Device-only memories remain private.
+
+The bottom Journal link is now Activity. It lists recent likes and replies received by the current anonymous owner on public Echoes, and tapping an item opens that Echo. Activity excludes the owner’s own interactions. Clearing site data loses the anonymous identity and ownership of that browser session.
+
+The database uses separate `urban_echo_likes` and `urban_echo_replies` tables with cascade cleanup when an Echo is deleted. Public reads are available to discovery visitors; inserts/deletes are restricted by RLS to the current anonymous user, and replies/likes cannot be added to the creator’s own Echo. The interaction tests cover duplicate-like idempotency, draft recovery after a failed reply, literal text rendering, activity ownership, forged author/delete attempts, GPS relocking, deletion cascades and narrow/landscape layouts.

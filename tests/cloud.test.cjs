@@ -89,7 +89,8 @@ function setup(options = {}) {
   const window = {
     URBAN_ECHO_CONFIG: {
       supabaseUrl: "https://example.supabase.co",
-      supabasePublishableKey: options.key === undefined ? "sb_publishable_test" : options.key,
+      supabasePublishableKey:
+        options.key === undefined ? "sb_publishable_test" : options.key,
     },
     EchoCore: require("../core.js"),
     supabase: { createClient: () => client },
@@ -166,4 +167,31 @@ test("photo deletion failure leaves the Echo row untouched", async () => {
     /has not been deleted/,
   );
   assert.ok(!calls.some((c) => c[0] === "delete"));
+});
+
+test("recording creation uses a separate owner-scoped media path and MIME", async () => {
+  const { cloud, calls } = setup();
+  await cloud.create(
+    { ...echo, mediaKind: "video" },
+    { type: "video/webm", size: 1024 },
+  );
+  const upload = calls.find((c) => c[0] === "upload");
+  assert.equal(upload[1], "owner/echo-id.webm");
+  assert.equal(upload[3].contentType, "video/webm");
+  const insert = calls.find((c) => c[0] === "insert")[1];
+  assert.equal(insert.media_kind, "video");
+  assert.equal(insert.media_path, "owner/echo-id.webm");
+  assert.equal(insert.photo_path, null);
+});
+test("recording type mismatch is rejected before storage or row insertion", async () => {
+  const { cloud, calls } = setup();
+  await assert.rejects(
+    () =>
+      cloud.create(
+        { ...echo, mediaKind: "video" },
+        { type: "audio/mp4", size: 1024 },
+      ),
+    /unsupported/,
+  );
+  assert.equal(calls.length, 0);
 });

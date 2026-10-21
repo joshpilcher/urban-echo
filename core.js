@@ -6,6 +6,31 @@
   "use strict";
   const RADIUS = 100;
   const MAX_FIX_AGE = 30000;
+  function mediaInfo(mime = "") {
+    const type = mime.split(";")[0].trim().toLowerCase();
+    const formats = {
+      "video/webm": ["video", "webm"],
+      "video/mp4": ["video", "mp4"],
+      "video/quicktime": ["video", "mov"],
+      "audio/webm": ["audio", "webm"],
+      "audio/mp4": ["audio", "mp4"],
+      "audio/x-m4a": ["audio", "m4a"],
+      "audio/mpeg": ["audio", "mp3"],
+      "audio/wav": ["audio", "wav"],
+      "audio/x-wav": ["audio", "wav"],
+      "audio/ogg": ["audio", "ogg"],
+    };
+    const pair = formats[type];
+    return pair
+      ? {
+          type,
+          kind: pair[0],
+          extension: pair[1],
+          maxBytes: (pair[0] === "video" ? 20 : 8) * 1024 * 1024,
+          maxSeconds: pair[0] === "video" ? 30 : 60,
+        }
+      : null;
+  }
   function validCoordinates(p) {
     return (
       !!p &&
@@ -52,6 +77,11 @@
   function validEcho(e) {
     return (
       validCoordinates(e) &&
+      ((e.mediaKind == null && !e.mediaId && !e.mediaPath) ||
+        (["audio", "video"].includes(e.mediaKind) &&
+          typeof (e.mediaId || e.mediaPath) === "string" &&
+          (e.mediaId || e.mediaPath).length <= 240 &&
+          !(e.photoId || e.photoPath))) &&
       typeof e.id === "string" &&
       e.id.length > 0 &&
       e.id.length <= 100 &&
@@ -66,6 +96,7 @@
     );
   }
   return {
+    mediaInfo,
     RADIUS,
     MAX_FIX_AGE,
     validCoordinates,

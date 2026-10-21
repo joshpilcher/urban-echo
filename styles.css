@@ -1923,3 +1923,22 @@ textarea::placeholder {
       ) calc(60px + env(safe-area-inset-bottom));
   }
 }
+
+/* Short audio/video memories share the existing Create flow. */
+.capture-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.capture-actions > button { min-height: 44px; flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.clip-files { display: grid; gap: 8px; margin: 12px 0; }
+.clip-files label { font-size: 14px; margin: 0; }
+.clip-files input { width: 100%; min-width: 0; font-size: 14px; padding: 10px; }
+.recorder, .clip-preview { border: 1px solid #b9d4d8; border-radius: 16px; padding: 12px; margin: 12px 0; background: #f2f8f8; }
+.recorder p { font-weight: 600; }
+#recording-live, #clip-player video, #detail-image video { width: 100%; max-height: 42dvh; object-fit: contain; border-radius: 12px; background: #10252c; }
+#clip-player audio, #detail-image audio { display: block; width: 100%; min-width: 0; }
+#detail-image:has(audio), #detail-image:has(video) { display: block; width: 100%; padding: 14px; }
+.detail-hero:has(audio), .detail-hero:has(video) { min-height: 100px; height: auto; }
+.media-note, .media-feedback { font-size: 13px; line-height: 1.5; color: #526574; }
+.media-feedback:empty { display: none; }
+#recording-status { color: #923d36; }
+.clip-import { margin: 12px 0; }
+.clip-import summary { color: var(--teal); cursor: pointer; padding: 12px 0; font-size: 14px; min-height: 44px; }
+.photo-picker:has(+ input:disabled) { opacity: .5; }

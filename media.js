@@ -1,4 +1,4 @@
-/* Photo preparation and private, per-origin blob storage. No photos in localStorage. */
+/* Media preparation and per-origin blob storage. Existing photo store preserved. */
 (() => {
   "use strict";
   const MAX_INPUT = 10 * 1024 * 1024;
@@ -8,7 +8,7 @@
     if (!database)
       database = new Promise((resolve, reject) => {
         if (!window.indexedDB) {
-          reject(new Error("Photo storage is not supported in this browser."));
+          reject(new Error("Media storage is not supported in this browser."));
           return;
         }
         const request = indexedDB.open("urban-echo-media", 1);
@@ -18,13 +18,13 @@
         request.onerror = () =>
           reject(
             new Error(
-              "Photo storage is unavailable. Your memory has not been saved.",
+              "Media storage is unavailable. Your memory has not been saved.",
             ),
           );
         request.onblocked = () =>
           reject(
             new Error(
-              "Photo storage is blocked. Close other Urban Echo tabs and retry.",
+              "Media storage is blocked. Close other Urban Echo tabs and retry.",
             ),
           );
       });
@@ -43,7 +43,7 @@
       tx.onerror = tx.onabort = () =>
         reject(
           new Error(
-            "Photo storage is unavailable or full. Your draft is still here.",
+            "Media storage is unavailable or full. Your draft is still here.",
           ),
         );
     });
@@ -107,7 +107,69 @@
       image.close?.();
     }
   }
+  async function prepareClip(file, expectedKind, recordedDuration) {
+    const info = window.EchoCore.mediaInfo(file?.type);
+    if (!info || info.kind !== expectedKind)
+      throw new Error(
+        "Choose a supported " +
+          expectedKind +
+          " file. Try MP4 or WebM for video; M4A, MP3, WAV, Ogg or WebM for audio.",
+      );
+    if (!file.size || file.size > info.maxBytes)
+      throw new Error(
+        "Choose " +
+          expectedKind +
+          " smaller than " +
+          info.maxBytes / 1024 / 1024 +
+          " MB.",
+      );
+    const url = URL.createObjectURL(file);
+    const player = document.createElement(expectedKind);
+    player.preload = "metadata";
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error("This file could not be opened. Try another format."),
+            ),
+          12000,
+        );
+        player.onloadedmetadata = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        player.onerror = () => {
+          clearTimeout(timer);
+          reject(
+            new Error(
+              "This browser cannot play this file. Try another format.",
+            ),
+          );
+        };
+        player.src = url;
+      });
+      // Recorded WebM can report Infinity until fully scanned. Our recorder supplies elapsed time.
+      const duration = recordedDuration ?? player.duration;
+      if (
+        !Number.isFinite(duration) ||
+        duration <= 0 ||
+        duration > info.maxSeconds + 0.5
+      )
+        throw new Error(
+          "Choose a clip up to " +
+            info.maxSeconds +
+            " seconds with a readable duration.",
+        );
+      return file.slice(0, file.size, info.type);
+    } finally {
+      player.removeAttribute("src");
+      player.load();
+      URL.revokeObjectURL(url);
+    }
+  }
   window.EchoMedia = {
+    prepareClip,
     prepare,
     put: (id, blob) => transaction("readwrite", (store) => store.put(blob, id)),
     get: (id) => transaction("readonly", (store) => store.get(id)),

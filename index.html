@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.4.0</span
+          <span class="version">WORKING PROTOTYPE · 0.5.0</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -308,8 +308,8 @@
           Add a memory <span class="optional">optional</span>
         </h3>
         <p class="muted">
-          One attachment per Echo. Add a photo, record a moment or capture the
-          sounds of this place.
+          Combine photos, videos and audio in this Echo. Up to 8 attachments, 50
+          MB total.
         </p>
         <label class="photo-picker" for="photo"
           ><svg class="icon"><use href="#icon-camera" /></svg
@@ -317,18 +317,16 @@
           ><span>JPEG, PNG or WebP · up to 10 MB</span></label
         ><input
           id="photo"
+          multiple
           class="sr-only"
           type="file"
           accept="image/jpeg,image/png,image/webp"
         />
+        <p id="attachment-summary" class="attachment-summary" role="status">
+          0 / 8 attachments · 0 / 50 MB
+        </p>
         <div class="photo-preview" id="photo-preview" hidden>
-          <img id="photo-preview-image" alt="Selected photo preview" /><button
-            type="button"
-            id="photo-remove"
-            class="photo-remove"
-          >
-            Remove photo
-          </button>
+          <div id="photo-items"></div>
         </div>
         <p id="photo-status" class="muted" role="status"></p>
         <div class="capture-actions" aria-label="Record a memory">
@@ -348,12 +346,14 @@
             <label for="video-file">Choose video file</label
             ><input
               id="video-file"
+              multiple
               type="file"
               accept="video/mp4,video/webm,video/quicktime"
             />
             <label for="audio-file">Choose audio file</label
             ><input
               id="audio-file"
+              multiple
               type="file"
               accept="audio/mp4,audio/x-m4a,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/webm"
             />
@@ -382,9 +382,6 @@
           hidden
         >
           <div id="clip-player"></div>
-          <button id="clip-remove" type="button" class="text-button">
-            Remove recording
-          </button>
         </section>
         <p id="clip-status" class="muted" role="status"></p>
         <p class="media-note">
@@ -421,7 +418,7 @@
           >
         </fieldset>
         <p id="sharing-explanation" class="privacy-note">
-          Your story, attachment and exact pin stay in this browser.
+          Your story, attachments and exact pin stay in this browser.
         </p>
         <p id="form-error" class="validation" role="alert"></p>
         <button id="save-echo" class="primary" type="submit">
@@ -456,7 +453,9 @@
           Delete this Echo
         </button>
         <div id="delete-confirm" class="delete-confirm" hidden>
-          <p>Delete this memory and its attachment? This cannot be undone.</p>
+          <p>
+            Delete this memory and all its attachments? This cannot be undone.
+          </p>
           <button id="delete-yes" class="secondary danger">Delete Echo</button
           ><button id="delete-no" class="secondary">Keep it</button>
         </div>

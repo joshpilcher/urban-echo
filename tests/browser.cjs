@@ -415,7 +415,7 @@ async function main() {
         await page.locator("#dialog").waitFor({ state: "hidden" });
         const stored = await page.evaluate(async () => {
           const record = JSON.parse(localStorage.getItem("urban-echo-v1"))[0];
-          const blob = await EchoMedia.get(record.photoId);
+          const blob = await EchoMedia.get(EchoCore.attachments(record)[0].id);
           const bitmap = await createImageBitmap(blob);
           return {
             record,
@@ -429,7 +429,7 @@ async function main() {
         assert.equal(stored.width, 1600);
         assert.equal(stored.height, 800);
         assert.ok(stored.size <= 1500 * 1024);
-        assert.ok(stored.record.photoId);
+        assert.ok(stored.record.attachments[0].id);
         assert.ok(!JSON.stringify(stored.record).includes("base64"));
         await page.reload({ waitUntil: "domcontentloaded" });
         assert.equal(await page.locator(".echo img").count(), 0);
@@ -470,7 +470,7 @@ async function main() {
         await page.locator("#detail-dialog").waitFor({ state: "hidden" });
         await page.waitForFunction(
           (id) => EchoMedia.get(id).then((blob) => !blob),
-          stored.record.photoId,
+          stored.record.attachments[0].id,
         );
         assert.equal(
           await page

@@ -29,13 +29,9 @@
     confirmationId = null,
     previousUnlocked = new Set(),
     followNextFix = true;
-  let photoBlob = null,
-    photoPreviewURL = null,
+  let draftAttachments = [],
     photoGeneration = 0,
-    preparingPhoto = false;
-  let clipBlob = null,
-    clipKind = null,
-    clipPreviewURL = null,
+    preparingPhoto = false,
     clipGeneration = 0,
     preparingClip = false;
   let saving = false,
@@ -166,43 +162,41 @@
           Date.parse(b.createdAt) - Date.parse(a.createdAt),
       );
   }
+  function cover(e) {
+    const items = Core.attachments(e);
+    return items.find((a) => a.kind === "photo") || items[0];
+  }
   function hasPhoto(e) {
-    return !!(e.photoId || e.photoPath);
+    return Core.attachments(e).some((a) => a.kind === "photo");
   }
   function mediaKind(e) {
-    return e.mediaKind || (hasPhoto(e) ? "photo" : "story");
-  }
-  function attachmentId(e) {
-    return e.mediaId || e.photoId;
-  }
-  function hasAttachment(e) {
-    return hasPhoto(e) || !!(e.mediaId || e.mediaPath);
+    return cover(e)?.kind || "story";
   }
   function owner(e) {
     return e.source !== "shared" || e.ownerId === Cloud.userId;
   }
-  function photoKey(e) {
+  function photoKey(e, a = cover(e)) {
     return (
       (e.source || "local") +
       ":" +
       e.id +
       ":" +
-      (e.mediaPath || e.mediaId || e.photoPath || e.photoId || "")
+      (a?.id || "") +
+      ":" +
+      (a?.path || "")
     );
   }
-  function attachmentURL(e) {
-    if (!hasAttachment(e)) return null;
-    if (e.source === "shared") return Cloud.mediaURL(e);
-    const key = photoKey(e);
+  function attachmentURL(e, a = cover(e)) {
+    if (!a) return null;
+    if (e.source === "shared") return Cloud.attachmentURL(a);
+    const key = photoKey(e, a);
     if (photos.has(key)) return photos.get(key).url;
     const entry = { url: null, ready: false };
     photos.set(key, entry);
-    Media.get(attachmentId(e))
+    Media.get(a.id)
       .then((blob) => {
         if (photos.get(key) !== entry) return;
-        if (blob) {
-          entry.url = URL.createObjectURL(blob);
-        }
+        if (blob) entry.url = URL.createObjectURL(blob);
         entry.ready = true;
         render();
       })
@@ -290,53 +284,85 @@
       undefined,
       { year: "numeric", month: "long", day: "numeric" },
     );
-    const imageArea = $("detail-image");
-    const kind = mediaKind(e);
-    const url = e.state === "unlocked" ? attachmentURL(e) : null;
-    const key = e.id + ":" + e.state + ":" + (url || "pending");
-    // Preserve playback position through GPS refreshes and other renders.
+    const imageArea = $("detail-image"),
+      items = Core.attachments(e);
+    const key = e.id + ":" + e.state;
     if (imageArea.dataset.mediaKey !== key) {
-      imageArea.querySelectorAll("audio,video").forEach((p) => {
-        p.pause();
-        p.removeAttribute("src");
-        p.load();
-      });
+      pausePlayers(imageArea);
       imageArea.replaceChildren();
       imageArea.dataset.mediaKey = key;
-      if (url && (kind === "audio" || kind === "video")) {
-        const player = node(kind);
-        player.controls = true;
-        player.preload = "metadata";
-        player.setAttribute("playsinline", "");
-        player.setAttribute("aria-label", kind + " memory: " + e.title);
-        player.src = url;
-        const feedback = node("p", "media-feedback");
-        feedback.setAttribute("role", "status");
-        player.addEventListener("error", () => {
-          feedback.textContent =
-            "This recording could not play here. Try another browser or check your connection.";
-        });
-        imageArea.append(player, feedback);
-      } else if (url) {
-        const image = node("img");
-        image.src = url;
-        image.alt = "Photo attached to “" + e.title + "”";
-        imageArea.append(image);
-      } else
-        imageArea.append(
-          icon(
-            e.state === "unlocked"
-              ? kind === "photo"
-                ? "camera"
-                : kind
-              : "lock",
-          ),
+    }
+    imageArea.classList.toggle(
+      "media-gallery",
+      items.length > 0 && e.state === "unlocked",
+    );
+    if (e.state !== "unlocked" || !items.length) {
+      if (!imageArea.firstChild)
+        imageArea.append(icon(e.state === "unlocked" ? "story" : "lock"));
+    } else {
+      for (const child of [...imageArea.children])
+        if (!items.some((a) => a.id === child.dataset.attachmentId)) {
+          pausePlayers(child);
+          child.remove();
+        }
+      items.forEach((a, index) => {
+        let area = [...imageArea.children].find(
+          (el) => el.dataset.attachmentId === a.id,
         );
+        if (!area) {
+          area = node("figure", "media-item");
+          area.dataset.attachmentId = a.id;
+          imageArea.append(area);
+        }
+        const url = attachmentURL(e, a);
+        if (url && area.dataset.url !== url) {
+          pausePlayers(area);
+          area.replaceChildren();
+          area.dataset.url = url;
+          const player = node(a.kind === "photo" ? "img" : a.kind);
+          if (a.kind === "photo")
+            player.alt =
+              "Photo " + (index + 1) + " attached to “" + e.title + "”";
+          else {
+            player.controls = true;
+            player.preload = "metadata";
+            player.setAttribute("playsinline", "");
+            player.setAttribute(
+              "aria-label",
+              a.kind + " attachment " + (index + 1) + ": " + e.title,
+            );
+          }
+          const feedback = node("p", "media-feedback");
+          feedback.setAttribute("role", "status");
+          player.addEventListener("error", () => {
+            feedback.textContent =
+              "This attachment could not load here. Check your connection or try another browser.";
+          });
+          player.src = url;
+          area.append(
+            player,
+            feedback,
+            node(
+              "figcaption",
+              "attachment-caption",
+              index +
+                1 +
+                " of " +
+                items.length +
+                " · " +
+                { photo: "Photo", video: "Video", audio: "Audio" }[a.kind],
+            ),
+          );
+        } else if (!url && !area.firstChild)
+          area.append(node("p", "muted", "Loading attachment…"));
+        if (!url && e.source !== "shared" && photos.get(photoKey(e, a))?.ready)
+          area.textContent = "This attachment is unavailable in this browser.";
+      });
     }
     $("detail-notice").textContent =
       e.source === "shared"
         ? "A memory shared with everyone. In-app discovery opens within 100 metres; public content is not private."
-        : "This memory and attachment stay in this browser. They are not shared with other people.";
+        : "This memory and attachments stay in this browser. They are not shared with other people.";
     $("delete-echo").hidden = !owner(e) || confirmationId === e.id;
     $("delete-confirm").hidden = confirmationId !== e.id || !owner(e);
     $("detail-close").disabled = deleting;
@@ -361,8 +387,8 @@
     const isPublic = $("visibility-public").checked;
     $("visibility-public").disabled = !Cloud.available || saving;
     $("sharing-explanation").textContent = isPublic
-      ? "Your title, story, attachment and exact pin will be public. Keep this browser to manage your shared Echoes; this prototype has no account recovery."
-      : "Your story, attachment and exact pin stay in this browser.";
+      ? "Your title, story, attachments and exact pin will be public. Keep this browser to manage your shared Echoes; this prototype has no account recovery."
+      : "Your story, attachments and exact pin stay in this browser.";
     $("save-echo").textContent = saving
       ? isPublic
         ? "Sharing your Echo…"
@@ -376,17 +402,30 @@
     $("story").disabled = saving;
     $("visibility-local").disabled = saving;
     $("close").disabled = saving;
-    $("photo").disabled = saving || preparingClip || recorder.busy;
+    $("photo").disabled =
+      saving || preparingPhoto || preparingClip || recorder.busy;
     for (const id of [
       "record-video",
       "record-audio",
       "video-file",
       "audio-file",
-      "clip-remove",
     ])
       $(id).disabled =
         saving || preparingPhoto || preparingClip || recorder.busy;
-    $("photo-remove").disabled = saving || recorder.busy;
+    document.querySelectorAll("[data-remove-attachment]").forEach((button) => {
+      button.disabled =
+        saving || preparingPhoto || preparingClip || recorder.busy;
+    });
+    const full = draftAttachments.length >= Core.MAX_ATTACHMENTS;
+    if (full)
+      for (const id of [
+        "photo",
+        "record-video",
+        "record-audio",
+        "video-file",
+        "audio-file",
+      ])
+        $(id).disabled = true;
     if (!$("dialog").open) return;
     const ready = Core.canCreate(fix);
     $("location-badge").textContent = ready
@@ -561,12 +600,25 @@
         node(
           "small",
           "",
-          {
-            photo: "Photo memory",
-            audio: "Audio memory",
-            video: "Video memory",
-            story: "Written memory",
-          }[mediaKind(e)] +
+          (Core.attachments(e).length > 1
+            ? Core.attachments(e).length +
+              " attachments · " +
+              [
+                ...new Set(
+                  Core.attachments(e).map(
+                    (a) =>
+                      ({ photo: "Photos", video: "Video", audio: "Audio" })[
+                        a.kind
+                      ],
+                  ),
+                ),
+              ].join(", ")
+            : {
+                photo: "Photo memory",
+                audio: "Audio memory",
+                video: "Video memory",
+                story: "Written memory",
+              }[mediaKind(e)]) +
             " · " +
             (e.source === "shared" ? "Public" : "This device"),
         ),
@@ -781,67 +833,124 @@
     $("dialog").showModal();
     updateForm();
   }
-  function clearPhoto() {
+  function pausePlayers(area) {
+    area.querySelectorAll("audio,video").forEach((p) => p.pause());
+  }
+  function renderDraftAttachments() {
+    for (const id of ["photo-items", "clip-player"]) {
+      pausePlayers($(id));
+      $(id).replaceChildren();
+    }
+    const totals = { photo: 0, audio: 0, video: 0 };
+    for (const attachment of draftAttachments) {
+      const { id, kind, url } = attachment;
+      totals[kind]++;
+      const area = node("figure", "draft-attachment");
+      area.dataset.attachmentId = id;
+      const player = node(kind === "photo" ? "img" : kind);
+      player.src = url;
+      if (kind === "photo") {
+        player.alt = "Selected photo " + totals.photo;
+        if (totals.photo === 1) player.id = "photo-preview-image";
+      } else {
+        player.controls = true;
+        player.preload = "metadata";
+        player.setAttribute("playsinline", "");
+        player.setAttribute("aria-label", "Selected " + kind + " preview");
+      }
+      const remove = node(
+        "button",
+        "text-button",
+        "Remove " + kind + " " + totals[kind],
+      );
+      remove.type = "button";
+      remove.dataset.removeAttachment = id;
+      if (kind === "photo" && totals.photo === 1) remove.id = "photo-remove";
+      if (kind !== "photo" && !$("clip-player").children.length)
+        remove.id = "clip-remove";
+      remove.addEventListener("click", () => {
+        pausePlayers(area);
+        URL.revokeObjectURL(url);
+        draftAttachments = draftAttachments.filter((a) => a.id !== id);
+        renderDraftAttachments();
+        updateForm();
+      });
+      area.append(player, remove);
+      $(kind === "photo" ? "photo-items" : "clip-player").append(area);
+    }
+    $("photo-preview").hidden = !totals.photo;
+    $("clip-preview").hidden = !totals.audio && !totals.video;
+    const size = draftAttachments.reduce((sum, a) => sum + a.blob.size, 0);
+    $("attachment-summary").textContent =
+      draftAttachments.length +
+      " / " +
+      Core.MAX_ATTACHMENTS +
+      " attachments · " +
+      (size / 1024 / 1024).toFixed(1) +
+      " / 50 MB";
+  }
+  function addDraftAttachment(blob, kind) {
+    if (draftAttachments.length >= Core.MAX_ATTACHMENTS)
+      throw new Error(
+        "You can add up to 8 attachments. Remove one to add another.",
+      );
+    if (
+      draftAttachments.reduce((sum, a) => sum + a.blob.size, 0) + blob.size >
+      Core.MAX_TOTAL_BYTES
+    )
+      throw new Error(
+        "Attachments must total no more than 50 MB. Remove one or choose a smaller file.",
+      );
+    draftAttachments.push({
+      id: crypto.randomUUID(),
+      kind,
+      blob,
+      url: URL.createObjectURL(blob),
+    });
+    renderDraftAttachments();
+  }
+  function clearDraftAttachments() {
     photoGeneration++;
-    photoBlob = null;
-    preparingPhoto = false;
-    $("photo").value = "";
-    $("photo-preview").hidden = true;
-    $("photo-status").textContent = "";
-    $("photo-preview-image").removeAttribute("src");
-    if (photoPreviewURL) URL.revokeObjectURL(photoPreviewURL);
-    photoPreviewURL = null;
+    clipGeneration++;
+    preparingPhoto = preparingClip = false;
+    draftAttachments.forEach((a) => URL.revokeObjectURL(a.url));
+    draftAttachments = [];
+    $("photo").value = $("video-file").value = $("audio-file").value = "";
+    $("photo-status").textContent = $("clip-status").textContent = "";
+    renderDraftAttachments();
     updateForm();
   }
   $("photo").addEventListener("change", async () => {
-    const file = $("photo").files?.[0];
-    if (!file) return;
+    const files = [...($("photo").files || [])];
+    if (!files.length) return;
     const token = ++photoGeneration;
     preparingPhoto = true;
-    $("photo-status").textContent = "Preparing your photo…";
-    $("form-error").textContent = "";
+    $("photo-status").textContent = "Preparing your photos…";
     updateForm();
+    const errors = [];
     try {
-      const blob = await Media.prepare(file);
-      if (token !== photoGeneration) return;
-      clearClip();
-      photoBlob = blob;
-      if (photoPreviewURL) URL.revokeObjectURL(photoPreviewURL);
-      photoPreviewURL = URL.createObjectURL(blob);
-      $("photo-preview-image").src = photoPreviewURL;
-      $("photo-preview").hidden = false;
-      $("photo-status").textContent =
-        "Photo ready · " +
-        Math.max(1, Math.round(blob.size / 1024)) +
-        " KB. Original photo metadata is not retained.";
-    } catch (error) {
-      if (token !== photoGeneration) return;
-      $("photo-status").textContent = error.message;
-      $("photo").value = "";
+      for (const file of files) {
+        if (token !== photoGeneration) return;
+        try {
+          const blob = await Media.prepare(file);
+          if (token !== photoGeneration) return;
+          addDraftAttachment(blob, "photo");
+        } catch (error) {
+          errors.push(error.message);
+        }
+      }
+      if (token === photoGeneration)
+        $("photo-status").textContent = errors.length
+          ? errors.join(" ")
+          : "Photos added. Original photo metadata is not retained.";
     } finally {
       if (token === photoGeneration) {
         preparingPhoto = false;
+        $("photo").value = "";
         updateForm();
       }
     }
   });
-  function pausePlayers(area) {
-    area.querySelectorAll("audio,video").forEach((p) => p.pause());
-  }
-  function clearClip() {
-    clipGeneration++;
-    clipBlob = null;
-    clipKind = null;
-    preparingClip = false;
-    pausePlayers($("clip-player"));
-    $("clip-player").replaceChildren();
-    $("clip-preview").hidden = true;
-    $("clip-status").textContent = "";
-    $("video-file").value = $("audio-file").value = "";
-    if (clipPreviewURL) URL.revokeObjectURL(clipPreviewURL);
-    clipPreviewURL = null;
-    updateForm();
-  }
   async function attachClip(file, kind, duration) {
     const token = ++clipGeneration;
     preparingClip = true;
@@ -850,41 +959,18 @@
     try {
       const blob = await Media.prepareClip(file, kind, duration);
       if (token !== clipGeneration) return;
-      clearPhoto();
-      pausePlayers($("clip-player"));
-      $("clip-player").replaceChildren();
-      if (clipPreviewURL) URL.revokeObjectURL(clipPreviewURL);
-      $("video-file").value = $("audio-file").value = "";
-      clipBlob = blob;
-      clipKind = kind;
-      clipPreviewURL = URL.createObjectURL(blob);
-      const player = node(kind);
-      player.controls = true;
-      player.preload = "metadata";
-      player.setAttribute("playsinline", "");
-      player.setAttribute("aria-label", "Selected " + kind + " preview");
-      player.src = clipPreviewURL;
-      $("clip-player").append(player);
-      $("clip-preview").hidden = false;
+      addDraftAttachment(blob, kind);
       $("clip-status").textContent =
         (kind === "audio" ? "Audio" : "Video") +
-        " ready · " +
-        (blob.size < 1024 * 1024
-          ? Math.max(1, Math.round(blob.size / 1024)) + " KB"
-          : (blob.size / 1024 / 1024).toFixed(1) + " MB") +
-        ". Preview before saving.";
+        " added. Preview before saving.";
     } catch (error) {
-      if (token === clipGeneration) {
-        $(kind + "-file").value = "";
+      if (token === clipGeneration)
         $("clip-status").textContent =
-          error.message +
-          (clipBlob || photoBlob
-            ? " Your previous attachment is still selected."
-            : "");
-      }
+          error.message + " Your selected attachments are still here.";
     } finally {
       if (token === clipGeneration) {
         preparingClip = false;
+        $(kind + "-file").value = "";
         updateForm();
       }
     }
@@ -942,14 +1028,13 @@
       $("clip-status").textContent = "";
       recorder.start(kind);
     });
-    $(kind + "-file").addEventListener("change", () => {
-      const file = $(kind + "-file").files?.[0];
-      if (file) attachClip(file, kind);
+    $(kind + "-file").addEventListener("change", async () => {
+      const files = [...($(kind + "-file").files || [])];
+      for (const file of files) await attachClip(file, kind);
     });
   }
   $("record-stop").addEventListener("click", recorder.stop);
   $("record-cancel").addEventListener("click", recorder.cancel);
-  $("clip-remove").addEventListener("click", clearClip);
   $("dialog").addEventListener("close", () => {
     recorder.cancel();
     pausePlayers($("clip-player"));
@@ -957,7 +1042,6 @@
   $("detail-dialog").addEventListener("close", () =>
     pausePlayers($("detail-image")),
   );
-  $("photo-remove").addEventListener("click", clearPhoto);
   $("title").addEventListener("input", updateForm);
   $("story").addEventListener("input", updateForm);
   document
@@ -1088,15 +1172,17 @@
       lng: fix.lng,
       createdAt: new Date().toISOString(),
     };
-    const selectedPhoto = photoBlob;
-    const selectedClip = clipBlob;
-    if (selectedClip) item.mediaKind = clipKind;
-    let storedPhoto = false;
+    const selectedAttachments = draftAttachments.map(({ id, kind, blob }) => ({
+      id,
+      kind,
+      blob,
+    }));
+    const storedAttachments = [];
     saving = true;
     updateForm();
     try {
       if (isPublic) {
-        const saved = await Cloud.create(item, selectedClip || selectedPhoto);
+        const saved = await Cloud.createCollection(item, selectedAttachments);
         sharedEchoes = [
           saved,
           ...sharedEchoes.filter((e) => e.id !== saved.id),
@@ -1104,26 +1190,27 @@
       } else {
         readEchoes();
         if (storageProblem) throw new Error(storageProblem);
-        if (selectedClip || selectedPhoto) {
-          await Media.put(item.id, selectedClip || selectedPhoto);
-          if (selectedClip) item.mediaId = item.id;
-          else item.photoId = item.id;
-          storedPhoto = true;
-        }
-        const next = [item, ...echoes];
         try {
+          item.attachments = [];
+          for (const attachment of selectedAttachments) {
+            await Media.put(attachment.id, attachment.blob);
+            storedAttachments.push(attachment.id);
+            item.attachments.push({ id: attachment.id, kind: attachment.kind });
+          }
+          const next = [item, ...echoes];
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          echoes = next;
         } catch {
-          if (storedPhoto) await Media.remove(item.id).catch(() => {});
+          await Promise.all(
+            storedAttachments.map((id) => Media.remove(id).catch(() => {})),
+          );
           throw new Error(
             "Browser storage is unavailable or full. Your Echo was not saved; your draft is still here.",
           );
         }
-        echoes = next;
       }
       $("echo-form").reset();
-      clearPhoto();
-      clearClip();
+      clearDraftAttachments();
       draftId = null;
       $("dialog").close();
       mineOnly = false;
@@ -1181,12 +1268,16 @@
           );
         }
         echoes = next;
-        if (attachmentId(e))
-          await Media.remove(attachmentId(e)).catch(() => {});
+        await Promise.all(
+          Core.attachments(e).map((a) => Media.remove(a.id).catch(() => {})),
+        );
       }
-      const cached = photos.get(photoKey(e));
-      if (cached?.url) URL.revokeObjectURL(cached.url);
-      photos.delete(photoKey(e));
+      for (const a of Core.attachments(e)) {
+        const key = photoKey(e, a),
+          cached = photos.get(key);
+        if (cached?.url) URL.revokeObjectURL(cached.url);
+        photos.delete(key);
+      }
       selectedId = confirmationId = null;
       $("detail-dialog").close();
       toast("Echo deleted.");
@@ -1234,6 +1325,7 @@
     setInterval(() => {
       if (!document.hidden) refreshShared();
     }, 60000);
+  renderDraftAttachments();
   initMap();
   readEchoes();
   render();

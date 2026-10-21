@@ -37,6 +37,7 @@
       createdAt: row.created_at,
       source: "shared",
       ownerId: row.owner_id,
+      attachments: row.attachments || [],
       photoPath: row.photo_path || null,
       mediaKind: row.media_kind || null,
       mediaPath: row.media_path || null,
@@ -76,7 +77,7 @@
     const { data, error } = await client
       .from(table)
       .select(
-        "id,title,story,lat,lng,created_at,owner_id,photo_path,media_kind,media_path",
+        "id,title,story,lat,lng,created_at,owner_id,photo_path,media_kind,media_path,attachments",
       )
       .order("created_at", { ascending: false })
       .limit(200);
@@ -162,15 +163,137 @@
       );
     return result;
   }
+  async function createCollection(echo, attachments) {
+    const Core = window.EchoCore;
+    if (
+      !Array.isArray(attachments) ||
+      attachments.length > Core.MAX_ATTACHMENTS ||
+      attachments.reduce((sum, a) => sum + (a.blob?.size || 0), 0) >
+        Core.MAX_TOTAL_BYTES
+    )
+      throw new Error(
+        "Choose up to 8 attachments, totalling no more than 50 MB.",
+      );
+    const user = await identify();
+    const uploads = attachments.map((a) => {
+      const info =
+        a.kind === "photo"
+          ? {
+              kind: "photo",
+              extension: "jpg",
+              type: "image/jpeg",
+              maxBytes: 1500 * 1024,
+            }
+          : Core.mediaInfo(a.blob?.type);
+      if (
+        !info ||
+        info.kind !== a.kind ||
+        !a.blob?.size ||
+        a.blob.size > info.maxBytes ||
+        a.blob.type.split(";")[0] !== info.type ||
+        !/^[0-9a-f-]{36}$/.test(a.id)
+      )
+        throw new Error(
+          "An attachment is invalid or too large. Your draft is still here.",
+        );
+      return {
+        id: a.id,
+        kind: a.kind,
+        path: user.id + "/" + echo.id + "/" + a.id + "." + info.extension,
+        blob: a.blob,
+        type: info.type,
+        bucket: a.kind === "photo" ? bucket : "urban-echo-recordings",
+      };
+    });
+    if (new Set(uploads.map((a) => a.id)).size !== uploads.length)
+      throw new Error("Attachment IDs must be unique.");
+    const attempted = [];
+    try {
+      for (let i = 0; i < uploads.length; i++) {
+        const a = uploads[i];
+        attempted.push(a);
+        const { error } = await client.storage
+          .from(a.bucket)
+          .upload(a.path, a.blob, {
+            contentType: a.type,
+            cacheControl: "3600",
+            upsert: false,
+          });
+        if (error && String(error.statusCode) !== "409")
+          throw new Error(
+            "Attachment " +
+              (i + 1) +
+              " could not upload. Check your connection and retry; your draft is still here.",
+          );
+      }
+      const row = {
+        id: echo.id,
+        owner_id: user.id,
+        title: echo.title,
+        story: echo.story,
+        lat: echo.lat,
+        lng: echo.lng,
+        attachments: uploads.map(({ id, kind, path }) => ({ id, kind, path })),
+      };
+      const { data, error } = await client
+        .from(table)
+        .insert(row)
+        .select()
+        .single();
+      if (error)
+        throw new Error(
+          "Your Echo could not be shared. Your draft is still here; please retry.",
+        );
+      const result = normalise(data);
+      if (!result)
+        throw new Error(
+          "The shared Echo response was invalid. Refresh before trying again.",
+        );
+      return result;
+    } catch (error) {
+      // Reconcile lost responses before deleting any file, including a failed upload
+      // that may have reached Storage. Preserve files if the outcome is unknown.
+      const existing = await client
+        .from(table)
+        .select()
+        .eq("id", echo.id)
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!existing.error && existing.data) {
+        const saved = normalise(existing.data);
+        if (saved) return saved;
+      }
+      if (!existing.error && !existing.data) {
+        for (const name of [bucket, "urban-echo-recordings"]) {
+          const paths = attempted
+            .filter((a) => a.bucket === name)
+            .map((a) => a.path);
+          if (paths.length)
+            await client.storage
+              .from(name)
+              .remove(paths)
+              .catch(() => {});
+        }
+      }
+      throw error;
+    }
+  }
   async function remove(echo) {
     const user = await identify();
     if (echo.ownerId !== user.id)
       throw new Error("Only the creator can delete this Echo.");
-    // Remove the photo first. A failure leaves the visible Echo intact for a retry.
-    if (echo.photoPath || echo.mediaPath) {
+    // Remove every object before the row. Any failure retains the row for retry.
+    for (const kind of ["photo", "recording"]) {
+      const paths = window.EchoCore.attachments(echo)
+        .filter((a) =>
+          kind === "photo" ? a.kind === "photo" : a.kind !== "photo",
+        )
+        .map((a) => a.path)
+        .filter(Boolean);
+      if (!paths.length) continue;
       const result = await client.storage
-        .from(echo.mediaPath ? "urban-echo-recordings" : bucket)
-        .remove([echo.mediaPath || echo.photoPath]);
+        .from(kind === "photo" ? bucket : "urban-echo-recordings")
+        .remove(paths);
       if (result.error)
         throw new Error(
           "The attachment could not be removed. Your Echo has not been deleted. Please retry.",
@@ -195,6 +318,15 @@
     },
     load,
     create,
+    createCollection,
+    attachmentURL: (attachment) =>
+      client && attachment.path
+        ? client.storage
+            .from(
+              attachment.kind === "photo" ? bucket : "urban-echo-recordings",
+            )
+            .getPublicUrl(attachment.path).data.publicUrl
+        : null,
     remove,
     mediaURL: (echo) =>
       client && (echo.mediaPath || echo.photoPath)

@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.5.1</span
+          <span class="version">WORKING PROTOTYPE · 0.5.2</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -436,9 +436,6 @@
           <svg class="icon"><use href="#icon-arrow" /></svg></button
         ><span>Echo memory</span>
       </div>
-      <div id="detail-hero" class="detail-hero">
-        <div id="detail-image"></div>
-      </div>
       <article class="detail-body">
         <span class="eyebrow" id="detail-state"></span>
         <h2 id="detail-title"></h2>
@@ -461,10 +458,12 @@
           hidden
         >
           <div class="gallery-heading">
-            <h3>More from this place</h3>
+            <h3>Photos &amp; video</h3>
             <span id="detail-gallery-count"></span>
           </div>
-          <div id="detail-thumbnails" class="detail-thumbnails"></div>
+          <div id="detail-hero" class="detail-visuals">
+            <div id="detail-image"></div>
+          </div>
         </section>
         <p id="detail-notice" class="privacy-note"></p>
         <button id="delete-echo" class="text-button danger" hidden>
@@ -496,6 +495,7 @@
     <script src="media.js"></script>
     <script src="recording.js"></script>
     <script src="cloud.js"></script>
+    <script src="audio-player.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -334,7 +334,7 @@ async function main() {
       await a.screenshot({
         path: path.join(
           root,
-          "test-results/screenshots/iteration-10-" + name + ".png",
+          "test-results/screenshots/iteration-11-" + name + ".png",
         ),
       });
     };
@@ -564,75 +564,99 @@ async function main() {
         await a.locator("#nav-nearby").click();
         await a.locator(".echo").filter({ hasText: galleryTitle }).click();
         await a.locator("#detail-image img").waitFor();
-        await a.locator("#detail-dialog audio").waitFor();
-        await a.locator('.media-thumbnail[aria-label^="View video"]').click();
+        await a.locator("#detail-dialog audio").waitFor({ state: "attached" });
         await a.locator("#detail-image video").waitFor();
         assert.equal(
           await a.locator("#detail-dialog [data-attachment-id]").count(),
           3,
         );
+        await a.waitForFunction(
+          () => document.querySelector(".wave-bars")?.dataset.ready === "true",
+        );
         if (!shared)
           await check(
-            "mock-up detail uses one hero, accessible thumbnails and audio below the story",
+            "story-first detail shows all media and waveform controls play pause and seek",
             async () => {
-              await a
-                .locator('.media-thumbnail[aria-label^="View photo"]')
-                .click();
-              assert.equal(await a.locator(".hero-media:visible").count(), 1);
-              assert.equal(await a.locator(".media-thumbnail").count(), 2);
-              assert.equal(
-                await a
-                  .locator('.media-thumbnail[aria-pressed="true"]')
-                  .getAttribute("aria-label"),
-                "View photo 1",
-              );
+              assert.equal(await a.locator(".full-media:visible").count(), 2);
+              assert.equal(await a.locator(".media-thumbnail").count(), 0);
               const order = await a.evaluate(() => {
                 const story = document.querySelector("#detail-story"),
                   audio = document.querySelector("#detail-audio"),
-                  thumbs = document.querySelector("#detail-gallery");
+                  visuals = document.querySelector("#detail-gallery");
                 return (
                   !!(
                     story.compareDocumentPosition(audio) &
                     Node.DOCUMENT_POSITION_FOLLOWING
                   ) &&
                   !!(
-                    audio.compareDocumentPosition(thumbs) &
+                    audio.compareDocumentPosition(visuals) &
                     Node.DOCUMENT_POSITION_FOLLOWING
                   )
                 );
               });
               assert.equal(order, true);
+              await a.waitForFunction(
+                () =>
+                  document.querySelector(".wave-bars")?.dataset.ready ===
+                  "true",
+              );
+              assert.equal(await a.locator(".wave-bars > span").count(), 48);
+              const toggle = a.locator(".audio-toggle"),
+                range = a.locator(".wave-range");
+              await toggle.click();
+              await a.waitForFunction(
+                () => !document.querySelector("#detail-dialog audio").paused,
+              );
+              assert.equal(await toggle.getAttribute("aria-pressed"), "true");
+              await toggle.click();
+              assert.equal(
+                await a
+                  .locator("#detail-dialog audio")
+                  .evaluate((p) => p.paused),
+                true,
+              );
+              await range.focus();
+              await a.keyboard.press("Home");
+              await a.keyboard.press("ArrowRight");
+              assert.ok(
+                (await a
+                  .locator("#detail-dialog audio")
+                  .evaluate((p) => p.currentTime)) > 0,
+              );
+              assert.match(
+                await a.locator(".audio-time").textContent(),
+                /0:\d{2} \/ 0:\d{2}/,
+              );
               for (const viewport of [
                 { width: 320, height: 568 },
                 { width: 390, height: 844 },
                 { width: 844, height: 390 },
               ]) {
                 await a.setViewportSize(viewport);
-                const fits = await a
-                  .locator("#detail-dialog")
-                  .evaluate((d) => d.scrollWidth <= d.clientWidth + 1);
-                assert.equal(fits, true);
-                for (const button of await a
-                  .locator(".media-thumbnail")
-                  .all()) {
-                  const box = await button.boundingBox();
-                  assert.ok(box.width >= 44 && box.height >= 44);
-                }
+                assert.equal(
+                  await a
+                    .locator("#detail-dialog")
+                    .evaluate((d) => d.scrollWidth <= d.clientWidth + 1),
+                  true,
+                );
+                const button = await toggle.boundingBox();
+                assert.ok(button.width >= 44 && button.height >= 44);
+                const widths = await a
+                  .locator(".full-media")
+                  .evaluateAll((items) =>
+                    items.map((x) => x.getBoundingClientRect().width),
+                  );
+                assert.ok(widths.every((w) => w > viewport.width * 0.7));
               }
               await a.setViewportSize({ width: 390, height: 844 });
               await a
                 .locator("#detail-dialog")
                 .evaluate((d) => (d.scrollTop = 0));
-              await galleryShot("photo-detail");
-              await a
-                .locator('.media-thumbnail[aria-label^="View video"]')
-                .focus();
-              await a.keyboard.press("Enter");
-              assert.equal(
-                await a.locator(".hero-media:visible video").count(),
-                1,
-              );
-              await a.locator("#detail-dialog audio").evaluate((p) => p.play());
+              await a.locator("#detail-title").click();
+              await galleryShot("story-detail");
+              await a.locator("#detail-gallery").scrollIntoViewIfNeeded();
+              await galleryShot("media-detail");
+              await toggle.click();
               await a.locator("#detail-image video").evaluate((p) => p.play());
               assert.equal(
                 await a
@@ -640,18 +664,13 @@ async function main() {
                   .evaluate((p) => p.paused),
                 true,
               );
-              await a
-                .locator('.media-thumbnail[aria-label^="View photo"]')
-                .click();
+              await toggle.click();
               assert.equal(
                 await a
                   .locator("#detail-image video")
                   .evaluate((p) => p.paused),
                 true,
               );
-              await a
-                .locator('.media-thumbnail[aria-label^="View video"]')
-                .click();
               await a.locator("#detail-dialog audio").evaluate((p) => {
                 window.__uiAudio = p;
                 return p.play();
@@ -663,25 +682,60 @@ async function main() {
                 .locator(".echo")
                 .filter({ hasText: galleryTitle })
                 .click();
-              await a
-                .locator('.media-thumbnail[aria-label^="View video"]')
-                .click();
-              await a.locator("#detail-dialog audio").evaluate((p) => {
-                window.__uiAudio = p;
-                return p.play();
-              });
+              await toggle.click();
               await a.keyboard.press("Escape");
-              assert.equal(await a.evaluate(() => __uiAudio.paused), true);
+              assert.equal(
+                await a
+                  .locator("#detail-dialog audio")
+                  .evaluate((p) => p.paused),
+                true,
+              );
               await emit(a);
               await a
                 .locator(".echo")
                 .filter({ hasText: galleryTitle })
                 .click();
-              await a
-                .locator('.media-thumbnail[aria-label^="View video"]')
-                .click();
             },
           );
+        if (!shared)
+          await check(
+            "audio remains playable when waveform decoding is unavailable",
+            async () => {
+              await a.evaluate(() => {
+                window.__offlineContext = window.OfflineAudioContext;
+                window.OfflineAudioContext = undefined;
+              });
+              try {
+                await emit(a, { ...point, latitude: point.latitude + 0.003 });
+                await emit(a);
+                await a.waitForFunction(
+                  () =>
+                    document.querySelector(".wave-bars")?.dataset.ready ===
+                    "unavailable",
+                );
+                await a.locator(".audio-toggle").click();
+                await a.waitForFunction(
+                  () => !document.querySelector("#detail-dialog audio").paused,
+                );
+                assert.equal(
+                  await a.locator(".audio-toggle").getAttribute("aria-pressed"),
+                  "true",
+                );
+              } finally {
+                await a.evaluate(
+                  () => (window.OfflineAudioContext = window.__offlineContext),
+                );
+              }
+              await emit(a, { ...point, latitude: point.latitude + 0.003 });
+              await emit(a);
+              await a.waitForFunction(
+                () =>
+                  document.querySelector(".wave-bars")?.dataset.ready ===
+                  "true",
+              );
+            },
+          );
+
         await a.locator("#detail-dialog audio").evaluate((p) => p.play());
         await a.locator("#detail-image video").evaluate((p) => p.play());
         await a.evaluate(
@@ -713,7 +767,6 @@ async function main() {
           true,
         );
         await emit(a);
-        await a.locator('.media-thumbnail[aria-label^="View video"]').click();
         await a.locator("#detail-image video").waitFor();
         galleryRecord = await a.evaluate(
           async ({ title, shared }) =>
@@ -742,7 +795,6 @@ async function main() {
           await b.locator(".echo").filter({ hasText: galleryTitle }).click();
           await b.locator("#detail-image img").waitFor();
           await b.locator("#detail-dialog audio").evaluate((p) => p.play());
-          await b.locator('.media-thumbnail[aria-label^="View video"]').click();
           await b.locator("#detail-image video").evaluate((p) => p.play());
           assert.equal(await b.locator("#delete-echo").isVisible(), false);
           const result = await b.evaluate(async (row) => {
@@ -879,7 +931,7 @@ async function main() {
           await a.locator("#nav-nearby").click();
           await a.locator(".echo").filter({ hasText: title }).click();
           const player = a.locator("#detail-dialog " + kind);
-          await player.waitFor();
+          await player.waitFor({ state: "attached" });
           await player.evaluate((p) => p.play());
           await a.waitForTimeout(350);
           const before = await player.evaluate((p) => p.currentTime);
@@ -908,7 +960,9 @@ async function main() {
             true,
           );
           await emit(a);
-          await a.locator("#detail-dialog " + kind).waitFor();
+          await a
+            .locator("#detail-dialog " + kind)
+            .waitFor({ state: "attached" });
           if (kind === "video") {
             await a.evaluate(() => {
               const x = document.createElement("p");
@@ -938,7 +992,9 @@ async function main() {
             await emit(b);
             await b.locator("#nav-nearby").click();
             await b.locator(".echo").filter({ hasText: title }).click();
-            await b.locator("#detail-dialog " + kind).waitFor();
+            await b
+              .locator("#detail-dialog " + kind)
+              .waitFor({ state: "attached" });
             await b.locator("#detail-dialog " + kind).evaluate((p) => p.play());
             assert.equal(await b.locator("#delete-echo").isVisible(), false);
             const result = await b.evaluate(async (title) => {

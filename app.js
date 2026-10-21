@@ -19,6 +19,7 @@
     watchId = null,
     generation = 0,
     expiryTimer = null;
+  let autoLocationDetails = false;
   let echoes = [],
     sharedEchoes = [],
     storageProblem = "",
@@ -83,7 +84,7 @@
       fadeAnimation: !reducedMotion,
       zoomAnimation: !reducedMotion,
       markerZoomAnimation: !reducedMotion,
-    }).setView([-26.65, 153.07], 12);
+    }).setView([-26.65, 153.07], 13);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
     const tiles = tileLayer(map);
     tiles.on("tileerror", () =>
@@ -147,7 +148,7 @@
         fillOpacity: 0.08,
       }).addTo(map);
     if (followNextFix) {
-      map.setView(p, 16);
+      map.setView(p, 17);
       followNextFix = false;
     }
   }
@@ -569,6 +570,8 @@
       return;
     }
     fix = next;
+    if (autoLocationDetails) showLocationDetails(false);
+
     clearTimeout(expiryTimer);
     expiryTimer = setTimeout(
       () => {
@@ -596,11 +599,17 @@
         minute: "2-digit",
         second: "2-digit",
       });
-    $("locate").textContent = "Recenter";
+    $("locate").textContent = window.matchMedia("(max-width: 900px)").matches
+      ? Core.canCreate(fix)
+        ? "GPS active"
+        : "GPS accuracy"
+      : "Recenter";
     updateUserLocation();
     render();
   }
   function gpsFailure(err) {
+    if (window.matchMedia("(max-width: 900px)").matches)
+      showLocationDetails(true, true);
     // Temporary unavailability/timeouts can be followed by a good reading on the
     // same watcher. Permission denial is terminal and releases the subscription.
     if (err.code === 1 || err.code === 0) clearWatch();
@@ -637,7 +646,7 @@
     }
     if (watchId !== null && Core.freshFix(fix)) {
       if (map)
-        map.stop().flyTo([fix.lat, fix.lng], 16, { animate: !reducedMotion });
+        map.stop().flyTo([fix.lat, fix.lng], 17, { animate: !reducedMotion });
       return;
     }
     // Retrying always cancels the previous subscription, including after errors.
@@ -667,6 +676,7 @@
     }
   }
   function stopTracking() {
+    showLocationDetails(false);
     clearWatch();
     invalidateFix();
     $("stop").hidden = true;
@@ -743,7 +753,23 @@
   document
     .querySelectorAll('input[name="visibility"]')
     .forEach((input) => input.addEventListener("change", updateForm));
-  $("locate").addEventListener("click", locate);
+  function showLocationDetails(open, automatic = false) {
+    autoLocationDetails = open && automatic;
+    document.querySelector(".location-panel").classList.toggle("is-open", open);
+    $("locate").setAttribute("aria-expanded", String(open));
+  }
+  $("locate").addEventListener("click", () => {
+    if (window.matchMedia("(max-width: 900px)").matches && Core.freshFix(fix)) {
+      showLocationDetails(
+        !document
+          .querySelector(".location-panel")
+          .classList.contains("is-open"),
+      );
+    } else locate();
+  });
+  $("location-close").addEventListener("click", () =>
+    showLocationDetails(false),
+  );
   $("stop").addEventListener("click", stopTracking);
   $("recenter").addEventListener("click", locate);
   $("create").addEventListener("click", openCreate);
@@ -785,6 +811,11 @@
     });
     render();
   }
+  document.querySelector(".skip-link").addEventListener("click", (event) => {
+    event.preventDefault();
+    navigation("nav-nearby", true);
+    $("discovery").focus({ preventScroll: true });
+  });
   $("nav-map").addEventListener("click", () => navigation("nav-map", false));
   $("nav-nearby").addEventListener("click", () =>
     navigation("nav-nearby", true),

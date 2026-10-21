@@ -210,11 +210,13 @@ async function main() {
         assert.doesNotMatch(await text("#echo-list"), /We stopped/);
         await emit(point);
         assert.match(await text(".echo-tag"), /UNLOCKED/);
+        await page.locator("#nav-nearby").click();
         await page.locator("#filter-unlocked").click();
         await emit({ ...point, latitude: point.latitude + 0.002 });
         assert.equal(await page.locator(".echo").count(), 0);
         assert.match(await text("#echo-list"), /No memories in this view/);
         await page.locator("#filter-all").click();
+        await page.locator("#nav-map").click();
         await emit(point);
       },
     );
@@ -382,7 +384,7 @@ async function main() {
         await page.screenshot({
           path: path.join(
             root,
-            "test-results/screenshots/iteration-03-photo-create.png",
+            "test-results/screenshots/iteration-05-photo-create.png",
           ),
         });
         await page.locator("#photo-test-label").evaluate((el) => el.remove());
@@ -427,7 +429,7 @@ async function main() {
         await page.screenshot({
           path: path.join(
             root,
-            "test-results/screenshots/iteration-03-photo-detail.png",
+            "test-results/screenshots/iteration-05-photo-detail.png",
           ),
         });
         await page.locator("#photo-test-label").evaluate((el) => el.remove());
@@ -532,12 +534,138 @@ async function main() {
         new StorageEvent("storage", { key: "urban-echo-v1" }),
       );
     }, fixtures);
+    await check(
+      "phone map preview and full list stay usable at small, large and landscape sizes",
+      async () => {
+        for (const size of [
+          { width: 320, height: 568 },
+          { width: 390, height: 844 },
+          { width: 430, height: 932 },
+          { width: 844, height: 390 },
+        ]) {
+          await page.setViewportSize(size);
+          await emit(point);
+          await page.locator("#nav-map").click();
+          const bounds = await page.evaluate(() => {
+            const r = (id) =>
+              document.getElementById(id).getBoundingClientRect();
+            const sheet = r("discovery"),
+              list = r("echo-list"),
+              create = r("create"),
+              gps = document
+                .querySelector(".location-panel")
+                .getBoundingClientRect(),
+              nav = document
+                .querySelector(".bottom-nav")
+                .getBoundingClientRect();
+            const card = document
+              .querySelector(".echo")
+              .getBoundingClientRect();
+            return {
+              width: document.documentElement.scrollWidth,
+              height: document.documentElement.scrollHeight,
+              pageFits:
+                document.documentElement.scrollWidth <= innerWidth &&
+                document.documentElement.scrollHeight <= innerHeight + 1,
+              sheetFits:
+                sheet.top >= r("map").top - 1 && sheet.bottom <= nav.top + 1,
+              createFits:
+                create.bottom <= sheet.bottom && create.top >= sheet.top,
+              cardHeight:card.height,listHeight:list.height,
+              cardFits: card.bottom <= list.bottom + 1,
+              gpsSeparate: gps.bottom <= sheet.top || gps.right <= sheet.left,
+              tapHeight: r("sheet-toggle").height,
+            };
+          });
+          assert.equal(bounds.pageFits, true, JSON.stringify({ size, bounds }));
+          assert.equal(bounds.sheetFits, true);
+          assert.equal(bounds.createFits, true);
+          assert.equal(bounds.cardFits, true, JSON.stringify({ size, bounds }));
+          assert.equal(
+            bounds.gpsSeparate,
+            true,
+            JSON.stringify({ size, bounds }),
+          );
+          assert.ok(bounds.tapHeight >= 44);
+          await page.locator("#sheet-toggle").click();
+          assert.equal(
+            await page.locator("#sheet-toggle").getAttribute("aria-expanded"),
+            "true",
+          );
+          assert.equal(
+            await page.locator("#nav-nearby").getAttribute("aria-current"),
+            "page",
+          );
+          assert.equal(
+            await page.locator(".location-panel").isVisible(),
+            false,
+          );
+          await page.locator(".echo").last().scrollIntoViewIfNeeded();
+          await page.locator(".echo").last().click();
+          await page.locator("#detail-close").click();
+          await page.locator("#nav-map").click();
+        }
+      },
+    );
+    await check(
+      "mobile search, long memory close control and short create viewport remain accessible",
+      async () => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.locator("#search-toggle").click();
+        await page.locator("#search").fill("quiet moment");
+        assert.equal(await page.locator(".echo").count(), 1);
+        await page.locator("#search-toggle").click();
+        assert.equal(await page.locator(".echo").count(), 2);
+        await page.evaluate(() => {
+          const rows = JSON.parse(localStorage.getItem("urban-echo-v1"));
+          rows[0].story = "Synthetic long-memory reading test. ".repeat(30);
+          localStorage.setItem("urban-echo-v1", JSON.stringify(rows));
+          dispatchEvent(new StorageEvent("storage", { key: "urban-echo-v1" }));
+        });
+        await emit(point);
+        await page.locator(".echo").first().click();
+        await page.locator("#detail-story").scrollIntoViewIfNeeded();
+        await page
+          .locator("#detail-dialog")
+          .evaluate((el) => (el.scrollTop = el.scrollHeight));
+        assert.equal(await page.locator("#detail-close").isVisible(), true);
+        assert.ok(
+          await page.locator("#detail-close").evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return r.top >= 0 && r.bottom <= innerHeight;
+          }),
+        );
+        await page.locator("#detail-close").click();
+        await emit(point);
+        await page.locator("#create").click();
+        await page.locator("#story").focus();
+        await page.setViewportSize({ width: 390, height: 420 });
+        await page.locator("#save-echo").scrollIntoViewIfNeeded();
+        assert.ok(
+          await page.locator("#save-echo").evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return r.top >= 0 && r.bottom <= innerHeight;
+          }),
+        );
+        assert.ok(
+          await page.locator("#close").evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return r.top >= 0 && r.bottom <= innerHeight;
+          }),
+        );
+        await page.locator("#close").click();
+        await page.setViewportSize({ width: 390, height: 844 });
+      },
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     await emit(point);
     await page.evaluate(() => {
       const b = document.createElement("div");
       b.id = "test-banner";
       b.textContent = "SIMULATED GPS · BROWSER TEST";
+      const shell = document.querySelector(".app");
+      shell.style.marginTop = "20px";
+      shell.style.height = "calc(100dvh - 20px)";
       b.style =
         "position:fixed;top:0;left:0;right:0;z-index:20000;background:#f3ce8e;color:#15262d;text-align:center;font:700 10px system-ui;padding:4px;pointer-events:none";
       document.body.append(b);
@@ -565,9 +693,14 @@ async function main() {
         );
     await emit(point);
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-03-mobile.png"),
+      path: path.join(root, "test-results/screenshots/iteration-05-mobile.png"),
       fullPage: true,
     });
+    await page.locator("#nav-nearby").click();
+    await page.screenshot({
+      path: path.join(root, "test-results/screenshots/iteration-05-nearby.png"),
+    });
+    await page.locator("#nav-map").click();
     await page.locator("#create").click();
     await page.locator("#title").fill("The start of something");
     await page
@@ -581,7 +714,7 @@ async function main() {
       dialog.prepend(note);
     });
     await page.screenshot({
-      path: path.join(root, "test-results/screenshots/iteration-03-create.png"),
+      path: path.join(root, "test-results/screenshots/iteration-05-create.png"),
       fullPage: false,
     });
     await page.locator("#dialog-test-banner").evaluate((el) => el.remove());
@@ -613,7 +746,7 @@ async function main() {
     await page.screenshot({
       path: path.join(
         root,
-        "test-results/screenshots/iteration-03-desktop.png",
+        "test-results/screenshots/iteration-05-desktop.png",
       ),
       fullPage: true,
     });

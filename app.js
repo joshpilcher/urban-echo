@@ -399,9 +399,7 @@
       filtered.filter((e) => e.state === "unlocked").length,
     );
     $("list-eyebrow").textContent = mineOnly ? "YOUR PLACES" : "DISCOVER";
-    $("list-heading").textContent = mineOnly
-      ? "My Echoes"
-      : "Stories around you";
+    $("list-heading").textContent = mineOnly ? "My Echoes" : "Nearby Echoes";
     $("discovery-summary").textContent = Core.freshFix(fix)
       ? unlocked.length + " within reach · walk closer to discover a story."
       : "Be here to discover what happened here.";
@@ -775,6 +773,7 @@
   function navigation(id, expanded, mine = false) {
     mineOnly = mine;
     $("discovery").classList.toggle("is-expanded", expanded);
+    $("sheet-label").textContent = expanded ? "Show map" : "View list";
     $("sheet-toggle").setAttribute("aria-expanded", String(expanded));
     $("sheet-toggle").setAttribute(
       "aria-label",
@@ -793,13 +792,14 @@
   $("nav-mine").addEventListener("click", () =>
     navigation("nav-mine", true, true),
   );
-  $("sheet-toggle").addEventListener("click", () =>
+  $("sheet-toggle").addEventListener("click", () => {
+    const expanded = !$("discovery").classList.contains("is-expanded");
     navigation(
-      mineOnly ? "nav-mine" : "nav-nearby",
-      !$("discovery").classList.contains("is-expanded"),
-      mineOnly,
-    ),
-  );
+      expanded ? (mineOnly ? "nav-mine" : "nav-nearby") : "nav-map",
+      expanded,
+      expanded && mineOnly,
+    );
+  });
   $("search-toggle").addEventListener("click", () => {
     const opening = $("search-bar").hidden;
     $("search-bar").hidden = !opening;

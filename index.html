@@ -79,7 +79,7 @@
         <symbol id="icon-arrow" viewBox="0 0 24 24">
           <path d="m14 5-7 7 7 7" />
         </symbol>
-      </defs>
+      <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></symbol></defs>
     </svg>
     <a class="skip-link" href="#discovery">Skip to Echoes</a>
     <div class="app">
@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.5.2</span
+          <span class="version">WORKING PROTOTYPE · 0.6.0</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -231,6 +231,11 @@
           </div>
         </aside>
       </main>
+      <section id="activity-view" class="activity-view" aria-labelledby="activity-title" hidden>
+        <header class="activity-heading"><div><p class="eyebrow">YOUR CONNECTIONS</p><h2 id="activity-title" tabindex="-1">Activity</h2></div><button id="activity-refresh" class="secondary">Refresh</button></header>
+        <p class="privacy-note">Likes and replies to your public Echoes. Your identity belongs to this browser; clearing site data loses access.</p>
+        <p id="activity-status" role="status"></p><div id="activity-list"></div>
+      </section>
       <nav class="bottom-nav" aria-label="App navigation">
         <button id="nav-map" aria-current="page">
           <svg class="icon"><use href="#icon-pin" /></svg
@@ -245,12 +250,8 @@
         ><button id="nav-mine">
           <svg class="icon"><use href="#icon-person" /></svg
           ><span>My Echoes</span></button
-        ><a
-          href="https://joshpilcher.github.io/urban-echo-process-journal/"
-          aria-label="View process journal"
-          ><svg class="icon"><use href="#icon-story" /></svg
-          ><span>Journal</span></a
-        >
+        ><button id="nav-activity">
+          <svg class="icon"><use href="#icon-heart" /></svg><span>Activity</span></button>
       </nav>
     </div>
     <div class="toast" id="toast" role="status" hidden></div>
@@ -465,6 +466,14 @@
             <div id="detail-image"></div>
           </div>
         </section>
+        <section id="echo-social" class="echo-social" aria-labelledby="replies-title" hidden>
+          <div class="social-actions"><button id="echo-like" class="secondary" aria-pressed="false">♡ Like · 0</button><button id="social-refresh" class="text-button">Refresh</button></div>
+          <h3 id="replies-title">Replies</h3><p id="social-status" role="status"></p>
+          <div id="reply-list"></div><button id="replies-more" class="text-button" hidden>Earlier replies</button>
+          <form id="reply-form"><label for="reply-body">Leave a reply</label><textarea id="reply-body" maxlength="500" rows="3" placeholder="What does this place mean to you?" required></textarea><small>Public · up to 500 characters</small><button id="reply-submit" class="primary" type="submit">Post reply</button></form>
+          <p id="social-error" class="validation" role="alert"></p>
+        </section>
+        <p id="social-unavailable" class="privacy-note"></p>
         <p id="detail-notice" class="privacy-note"></p>
         <button id="delete-echo" class="text-button danger" hidden>
           Delete this Echo
@@ -496,6 +505,7 @@
     <script src="recording.js"></script>
     <script src="cloud.js"></script>
     <script src="audio-player.js"></script>
+    <script src="social.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

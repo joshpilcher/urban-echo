@@ -309,6 +309,58 @@
         "Your Echo could not be deleted. Check your connection and retry.",
       );
   }
+  async function interactions(echoId, before = null) {
+    if (!client) throw new Error("Shared interactions are unavailable.");
+    const session = await client.auth.getSession();
+    currentUser = session.data?.session?.user || null;
+    let replies = client.from("urban_echo_replies").select("id,echo_id,user_id,body,created_at")
+      .eq("echo_id", echoId).order("created_at", {ascending: false}).order("id", {ascending: false}).limit(51);
+    if (before) replies = replies.or("created_at.lt."+before.created_at+",and(created_at.eq."+before.created_at+",id.lt."+before.id+")");
+    const [count, mine, thread] = await Promise.all([
+      client.from("urban_echo_likes").select("echo_id", {count: "exact", head: true}).eq("echo_id", echoId),
+      currentUser ? client.from("urban_echo_likes").select("user_id").eq("echo_id", echoId).eq("user_id", currentUser.id) : Promise.resolve({data: []}),
+      replies
+    ]);
+    if (count.error || mine.error || thread.error) throw new Error("Interactions could not load. Tap Refresh to retry.");
+    return {count: count.count || 0, liked: !!mine.data?.length, replies: (thread.data || []).slice(0,50), more: (thread.data || []).length > 50};
+  }
+  async function like(echoId, liked) {
+    const user = await identify();
+    const result = liked
+      ? await client.from("urban_echo_likes").upsert({echo_id: echoId, user_id: user.id}, {onConflict: "echo_id,user_id", ignoreDuplicates: true})
+      : await client.from("urban_echo_likes").delete().eq("echo_id",echoId).eq("user_id",user.id);
+    if (result.error) throw new Error("Your like could not be saved. Refresh to check, then retry.");
+  }
+  async function reply(echoId, id, body) {
+    body = body.trim();
+    if (!body || [...body].length > 500) throw new Error("Write a reply of 1–500 characters.");
+    const user = await identify();
+    const result = await client.from("urban_echo_replies").insert({id,echo_id:echoId,user_id:user.id,body});
+    if (result.error) {
+      const existing = await client.from("urban_echo_replies").select("id").eq("id",id).eq("user_id",user.id).maybeSingle();
+      if (!existing.error && existing.data) return;
+      throw new Error("Your reply could not be saved. Your draft is still here; retry when connected.");
+    }
+  }
+  async function removeReply(id) {
+    const user = await identify();
+    const result = await client.from("urban_echo_replies").delete().eq("id",id).eq("user_id",user.id);
+    if (result.error) throw new Error("Your reply could not be deleted. Please retry.");
+  }
+  async function activity() {
+    if (!client) return [];
+    const session = await client.auth.getSession();
+    currentUser = session.data?.session?.user || null;
+    if (!currentUser) return [];
+    const uid = currentUser.id;
+    const results = await Promise.all(["urban_echo_likes","urban_echo_replies"].map(name =>
+      client.from(name).select("*,urban_echoes!inner(id,title,owner_id)").eq("urban_echoes.owner_id",uid)
+        .neq("user_id",uid).order("created_at",{ascending:false}).limit(100)
+    ));
+    if (results.some(r=>r.error)) throw new Error("Activity could not load. Check your connection and refresh.");
+    return results.flatMap((r,i)=>(r.data || []).map(item=>({...item,kind:i ? "reply" : "like"})))
+      .sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)).slice(0,100);
+  }
   window.EchoCloud = {
     get available() {
       return !!client;
@@ -317,6 +369,7 @@
       return currentUser?.id || null;
     },
     load,
+    interactions, like, reply, removeReply, activity,
     create,
     createCollection,
     attachmentURL: (attachment) =>

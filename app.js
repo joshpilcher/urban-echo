@@ -285,6 +285,7 @@
       { year: "numeric", month: "long", day: "numeric" },
     );
     drawDetailMedia(e);
+    window.EchoSocial.update(e);
     $("detail-notice").textContent =
       e.source === "shared"
         ? "A memory shared with everyone. In-app discovery opens within 100 metres; public content is not private."
@@ -1135,6 +1136,7 @@
     render();
   });
   function navigation(id, expanded, mine = false) {
+    $("activity-view").hidden = id !== "nav-activity";
     mineOnly = mine;
     $("discovery").classList.toggle("is-expanded", expanded);
     $("sheet-label").textContent = expanded ? "Show map" : "View list";
@@ -1161,6 +1163,16 @@
       : "all";
     navigation("nav-nearby", true);
   });
+  const refreshActivity = () => window.EchoSocial.activity(async id => {
+    let e = allRecords().find(item=>item.id===id);
+    if (!e) {await refreshShared();e=allRecords().find(item=>item.id===id);}
+    if(e) openDetail(id); else toast("This Echo is no longer available in the current collection.");
+  });
+  $("nav-activity").addEventListener("click",()=>{
+    navigation("nav-activity",false);refreshActivity();$("activity-title").focus({preventScroll:true});
+  });
+  $("activity-refresh").addEventListener("click",refreshActivity);
+  $("detail-dialog").addEventListener("close",()=>window.EchoSocial.update(null));
   $("nav-map").addEventListener("click", () => navigation("nav-map", false));
   $("nav-nearby").addEventListener("click", () =>
     navigation("nav-nearby", true),

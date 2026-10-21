@@ -263,7 +263,6 @@
       pin.bindTooltip(node("span", "", e.title));
     });
   }
-  let detailVisualId = null;
   function drawDetail() {
     if (!$("detail-dialog").open) return;
     const e = allRecords().find((e) => e.id === selectedId);
@@ -299,41 +298,21 @@
   function drawDetailMedia(e) {
     const hero = $("detail-image"),
       audio = $("detail-audio"),
-      thumbs = $("detail-thumbnails"),
       items = Core.attachments(e);
     const unlocked = e.state === "unlocked",
       key = e.id + ":" + unlocked;
     if (hero.dataset.mediaKey !== key) {
+      disposeAudioPlayers($("detail-dialog"));
       pausePlayers($("detail-dialog"));
       hero.replaceChildren();
       audio.replaceChildren();
-      thumbs.replaceChildren();
       hero.dataset.mediaKey = key;
-      detailVisualId = null;
     }
     const visuals = items.filter((a) => a.kind !== "audio"),
       sounds = items.filter((a) => a.kind === "audio");
     $("detail-gallery").hidden = !unlocked || !visuals.length;
     audio.hidden = !unlocked || !sounds.length;
-    $("detail-hero").classList.toggle(
-      "has-visual",
-      unlocked && visuals.length > 0,
-    );
-    if (!unlocked || !visuals.length) {
-      if (!hero.firstChild) {
-        const placeholder = node("div", "detail-placeholder");
-        placeholder.append(
-          icon(!unlocked ? "lock" : sounds.length ? "audio" : "story"),
-        );
-        if (unlocked && sounds.length)
-          placeholder.append(node("span", "", "Sounds of this place"));
-        hero.append(placeholder);
-      }
-    }
     if (!unlocked) return;
-    if (!visuals.some((a) => a.id === detailVisualId))
-      detailVisualId =
-        visuals.find((a) => a.kind === "photo")?.id || visuals[0]?.id;
     function updateMedia(area, a, index) {
       const url = attachmentURL(e, a);
       if (url && area.dataset.url !== url) {
@@ -346,8 +325,7 @@
             "Photo " + (index + 1) + " attached to “" + e.title + "”";
         else {
           player.controls = true;
-          player.preload =
-            a.kind === "video" && a.id !== detailVisualId ? "none" : "metadata";
+          player.preload = "metadata";
           player.setAttribute("playsinline", "");
           player.setAttribute(
             "aria-label",
@@ -368,7 +346,16 @@
             "This attachment could not load. Check your connection or try another browser.";
         });
         player.src = url;
-        area.append(player, feedback);
+        if (a.kind === "audio" && window.EchoAudio)
+          area.append(
+            window.EchoAudio.create(
+              player,
+              "audio memory " + (index + 1),
+              feedback,
+            ),
+            feedback,
+          );
+        else area.append(player, feedback);
       } else if (!url && !area.firstChild)
         area.append(node("p", "muted", "Loading attachment…"));
       if (!url && e.source !== "shared" && photos.get(photoKey(e, a))?.ready)
@@ -380,54 +367,20 @@
         (el) => el.dataset.attachmentId === a.id,
       );
       if (!area) {
-        area = node("figure", "media-item hero-media");
+        area = node("figure", "media-item full-media");
         area.dataset.attachmentId = a.id;
         hero.append(area);
       }
-      const active = a.id === detailVisualId;
-      if (!active) pausePlayers(area);
-      area.hidden = !active;
-      const url = updateMedia(area, a, index);
-      let button = [...thumbs.children].find(
-        (el) => el.dataset.selectVisual === a.id,
-      );
-      if (!button) {
-        button = node("button", "media-thumbnail");
-        button.type = "button";
-        button.dataset.selectVisual = a.id;
-        button.setAttribute(
-          "aria-label",
-          "View " +
-            (a.kind === "photo" ? "photo" : "video") +
-            " " +
-            (index + 1),
-        );
-        button.append(
-          icon(a.kind === "photo" ? "camera" : "video"),
+      area.hidden = false;
+      updateMedia(area, a, index);
+      if (!area.querySelector("figcaption"))
+        area.append(
           node(
-            "span",
-            "thumbnail-caption",
+            "figcaption",
+            "attachment-caption",
             (a.kind === "photo" ? "Photo " : "Video ") + (index + 1),
           ),
         );
-        button.addEventListener("click", () => {
-          detailVisualId = a.id;
-          drawDetail();
-          $("detail-hero").scrollIntoView({
-            block: "start",
-            behavior: reducedMotion ? "instant" : "smooth",
-          });
-        });
-        thumbs.append(button);
-      }
-      if (a.kind === "photo" && url && !button.querySelector("img")) {
-        const image = node("img");
-        image.src = url;
-        image.alt = "";
-        image.loading = "lazy";
-        button.prepend(image);
-      }
-      button.setAttribute("aria-pressed", String(active));
     });
     $("detail-gallery-count").textContent =
       visuals.length + (visuals.length === 1 ? " moment" : " moments");
@@ -921,6 +874,11 @@
     $("dialog").showModal();
     updateForm();
   }
+  function disposeAudioPlayers(area) {
+    area
+      .querySelectorAll(".echo-audio")
+      .forEach((widget) => widget.dispose?.());
+  }
   function pausePlayers(area) {
     area.querySelectorAll("audio,video").forEach((p) => p.pause());
   }
@@ -1389,6 +1347,7 @@
   window.addEventListener("pagehide", () => {
     recorder.cancel();
     pausePlayers($("clip-player"));
+    disposeAudioPlayers($("detail-dialog"));
     pausePlayers($("detail-dialog"));
     stopTracking();
     for (const entry of photos.values())

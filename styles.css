@@ -2067,3 +2067,11 @@ textarea::placeholder {
 #record-start { min-height:48px; }
 
 .recorder[data-state="ready"] #recording-status { color: var(--teal); }
+
+/* Approaching a place strengthens its marker without changing the unlock rule. */
+.echo-marker { margin:3px; transform:rotate(-45deg) scale(var(--echo-scale,.72)); opacity:var(--echo-opacity,.55); --echo-halo-color:12,123,131; box-shadow:0 0 0 calc(var(--echo-presence,0) * 9px) rgba(var(--echo-halo-color),calc(.03 + var(--echo-presence,0) * .14)), 0 3px 8px #1c3a4c33; transition:transform 450ms ease,opacity 450ms ease,box-shadow 450ms ease,background-color 450ms ease; }
+.echo-marker.is-uncertain { background:#a36e21; --echo-halo-color:176,116,28; }
+.echo-marker.is-unavailable { background:#6c7b83; }
+.echo-marker.is-unlocked { box-shadow:0 0 0 3px #d8f3ed,0 0 0 12px #11879030,0 4px 14px #106d7955; }
+.leaflet-marker-icon:focus-visible .echo-marker { outline:3px solid #1695b0; outline-offset:4px; }
+@media(prefers-reduced-motion:reduce) { .echo-marker { transition:none; } }

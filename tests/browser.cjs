@@ -238,6 +238,27 @@ async function main() {
         await emit(point);
       },
     );
+    await check("map markers strengthen on approach without revealing a locked story", async () => {
+      await page.evaluate(()=>{window.__approachFace=document.querySelector('.echo-marker');window.__approachPin=__approachFace.closest('.leaflet-marker-icon');});
+      const values=[];
+      for(const metres of [600,300,150,50]) {
+        await emit({...point,latitude:point.latitude+metres/111195});
+        values.push(await page.locator('.echo-marker').first().evaluate(e=>({p:Number(e.dataset.proximity),width:e.getBoundingClientRect().width,opacity:Number(getComputedStyle(e).opacity)})));
+        if(metres>100) assert.doesNotMatch(await text('#echo-list'),/We stopped/);
+      }
+      for(let i=1;i<values.length;i++) {assert.ok(values[i].p>values[i-1].p);assert.ok(values[i].width>values[i-1].width);assert.ok(values[i].opacity>values[i-1].opacity);}
+      assert.equal(await page.locator('.echo-marker.is-unlocked').count(),1);
+      assert.match(await text('#echo-list'),/We stopped/);
+      assert.equal(await page.evaluate(()=>document.querySelector('.echo-marker')===__approachFace&&__approachFace.closest('.leaflet-marker-icon')===__approachPin),true);
+      assert.equal(await page.locator('.echo-marker').evaluate(e=>getComputedStyle(e).transitionDuration),'0s');
+      const hit=await page.locator('.echo-marker').evaluate(e=>e.closest('.leaflet-marker-icon').getBoundingClientRect().width);assert.ok(hit>=44);
+      await emit({...point,latitude:point.latitude+.00085,accuracy:15});
+      assert.equal(await page.locator('.echo-marker.is-uncertain').count(),1);
+      assert.doesNotMatch(await text('#echo-list'),/We stopped/);
+      await page.evaluate(()=>__gps.error(2));
+      assert.equal(await page.locator('.echo-marker.is-unavailable').getAttribute('data-proximity'),'0.000');
+      await emit(point);
+    });
     await check("poor GPS disables creation and prevents unlock", async () => {
       await emit({ ...point, accuracy: 200 });
       assert.equal(await page.locator("#create").isDisabled(), true);

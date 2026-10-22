@@ -5,6 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
   const RADIUS = 100;
+  const APPROACH_RADIUS = 500;
   const MAX_FIX_AGE = 30000;
   function mediaInfo(mime = "") {
     const type = mime.split(";")[0].trim().toLowerCase();
@@ -123,7 +124,7 @@
     return freshFix(fix, now) && fix.accuracy <= RADIUS;
   }
   function discovery(echo, fix, now = Date.now()) {
-    if (!freshFix(fix, now)) return { state: "unavailable", distance: null };
+    if (!freshFix(fix, now)) return { state: "unavailable", distance: null, proximity: 0 };
     const distance = metres(fix, echo);
     // The reported accuracy is an estimate, not proof of physical presence.
     const state =
@@ -132,7 +133,11 @@
         : distance + fix.accuracy <= RADIUS
           ? "unlocked"
           : "uncertain";
-    return { state, distance };
+    // Emphasis grows over the approach; reported uncertainty softens the signal.
+    const proximity = Math.max(0, Math.min(1,
+      (APPROACH_RADIUS - distance - fix.accuracy) / (APPROACH_RADIUS - RADIUS),
+    ));
+    return { state, distance, proximity };
   }
   function validEcho(e) {
     return (
@@ -163,6 +168,7 @@
     mediaInfo,
     importMediaInfo,
     RADIUS,
+    APPROACH_RADIUS,
     MAX_FIX_AGE,
     validCoordinates,
     metres,

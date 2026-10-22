@@ -141,3 +141,9 @@ The existing-file picker supports MP4, MOV, M4V and WebM video within the existi
 The metadata reader is now attached, muted and inline, waits for a finite duration across metadata/duration events, and cleans up on success, failure or timeout. Imported WebM files without a duration header can be scanned before validation. Limits appear beside the chooser, rejection messages show the file size or duration, and the status/preview is brought into view.
 
 Tests include checked-in generated H.264 MP4 and QuickTime MOV fixtures, import/preview/play/removal with normal, missing and generic MIME types, plus delayed metadata and malformed-file rejection. These do not identify the exact cause for the reported phone clip without that file or its error message.
+
+## Visual approach to an Echo (v0.6.3)
+
+Markers gradually grow, become more opaque and gain a halo as the user approaches from 500 metres. The signal accounts for reported GPS accuracy. Uncertain nearby markers use amber; unlocked markers use a stronger teal ring. A stopped/stale location returns markers to a neutral state. Full content remains gated by the existing 100-metre, accuracy-aware rule.
+
+The outer marker target remains 44 px even when its visible pin is smaller. Marker elements stay in place across GPS updates so transitions can run; reduced-motion settings disable the transitions. Accessible labels include each Echo's state and distance, and closer markers receive a higher stacking order. The approach distance is an initial design choice that still needs an outdoor phone evaluation.

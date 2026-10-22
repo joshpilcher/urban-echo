@@ -18,7 +18,7 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=0.6.1" />
   </head>
   <body>
     <svg
@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.6.0</span
+          <span class="version">WORKING PROTOTYPE · 0.6.1</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -369,6 +369,7 @@
           <video id="recording-live" autoplay muted playsinline hidden></video>
           <p id="recording-status" role="status"></p>
           <div class="capture-actions">
+            <button id="record-start" type="button" class="primary" hidden>Start recording</button>
             <button id="record-stop" type="button" class="secondary">
               Stop recording</button
             ><button id="record-cancel" type="button" class="text-button">
@@ -386,7 +387,7 @@
         </section>
         <p id="clip-status" class="muted" role="status"></p>
         <p class="media-note">
-          Camera and microphone access starts only when you tap Record. Preview
+          Record video or audio opens a device preview. Tap Start recording when ready. Preview
           before saving. Add spoken words as text in your story so others can
           read them too. Selected audio/video files retain their original
           metadata.
@@ -502,11 +503,11 @@
     <script src="config.js"></script>
     <script src="core.js"></script>
     <script src="media.js"></script>
-    <script src="recording.js"></script>
+    <script src="recording.js?v=0.6.1"></script>
     <script src="cloud.js"></script>
     <script src="audio-player.js"></script>
     <script src="social.js"></script>
-    <script src="video-preview.js"></script>
-    <script src="app.js"></script>
+    <script src="video-preview.js?v=0.6.1"></script>
+    <script src="app.js?v=0.6.1"></script>
   </body>
 </html>

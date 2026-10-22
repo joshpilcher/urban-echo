@@ -141,7 +141,7 @@ async function main() {
         }
       });
       await p
-        .locator(name === "video-recording" ? "#recorder" : "#clip-preview")
+        .locator(["video-recording","video-ready","audio-ready"].includes(name) ? "#recorder" : "#clip-preview")
         .scrollIntoViewIfNeeded();
       await p.screenshot({
         path: path.join(
@@ -194,15 +194,18 @@ async function main() {
         },
       );
       await check(
-        "closing active camera recording stops tracks without creating an attachment",
+        "closing ready and recording cameras stops tracks without creating an attachment",
         async () => {
-          await a.locator("#record-video").click();
-          await a.locator("#recording-live").waitFor({ state: "visible" });
-          await a.locator("#close").click();
-          await a.waitForFunction(() =>
-            __tracks.every((t) => t.readyState === "ended"),
-          );
-          assert.equal(await a.locator("#clip-preview").isVisible(), false);
+          for (const recording of [false,true]) {
+            if (!(await a.locator("#dialog").isVisible())) await open(a);
+            await a.locator("#record-video").click();
+            await a.locator("#record-start").waitFor({state:"visible"});
+            await a.locator("#recording-live").waitFor({state:"visible"});
+            if (recording) await a.locator("#record-start").click();
+            await a.locator("#close").click();
+            await a.waitForFunction(() => __tracks.every(t=>t.readyState === "ended"));
+            assert.equal(await a.locator("#clip-preview").isVisible(), false);
+          }
         },
       );
       await check(
@@ -396,6 +399,14 @@ async function main() {
         );
         for (const kind of ["audio", "video"]) {
           await a.locator("#record-" + kind).click();
+          await a.locator("#record-start").waitFor({state:"visible"});
+          assert.equal(await a.locator("#record-stop").isVisible(), false);
+          assert.equal(await a.locator("#save-echo").isDisabled(), true);
+          await a.waitForTimeout(350);
+          assert.match(await a.locator("#recording-status").textContent(), /ready/);
+          await screenshot(a, kind + "-ready");
+          await fs.copyFile(path.join(root,"test-results/screenshots/iteration-08-"+kind+"-ready.png"),path.join(root,"test-results/screenshots/iteration-16-"+kind+"-ready.png"));
+          await a.locator("#record-start").click();
           await a.waitForFunction(() =>
             document
               .querySelector("#recording-status")
@@ -583,7 +594,7 @@ async function main() {
         await emit(a);
         await a.locator("#nav-nearby").click();
         await a.locator(".echo").filter({ hasText: galleryTitle }).click();
-        await a.locator("#detail-image img").waitFor();
+        await a.locator("#detail-image .full-media > img").waitFor();
         await a.locator("#detail-dialog audio").waitFor({ state: "attached" });
         await a.locator("#detail-image video").waitFor();
         assert.equal(
@@ -813,7 +824,7 @@ async function main() {
           await emit(b);
           await b.locator("#nav-nearby").click();
           await b.locator(".echo").filter({ hasText: galleryTitle }).click();
-          await b.locator("#detail-image img").waitFor();
+          await b.locator("#detail-image .full-media > img").waitFor();
           await b.locator("#detail-dialog audio").evaluate((p) => p.play());
           await b.waitForFunction(() => document.querySelector("#detail-image video")?.dataset.preview === "ready");
           await b.locator("#detail-image video").evaluate((p) => p.play());
@@ -917,6 +928,14 @@ async function main() {
                 " fixture, not an outdoor recording. Spoken words would be transcribed here.",
             );
           await a.locator("#record-" + kind).click();
+          await a.locator("#record-start").waitFor({state:"visible"});
+          assert.equal(await a.locator("#record-stop").isVisible(), false);
+          assert.equal(await a.locator("#save-echo").isDisabled(), true);
+          await a.waitForTimeout(350);
+          assert.match(await a.locator("#recording-status").textContent(), /ready/);
+          await screenshot(a, kind + "-ready");
+          await fs.copyFile(path.join(root,"test-results/screenshots/iteration-08-"+kind+"-ready.png"),path.join(root,"test-results/screenshots/iteration-16-"+kind+"-ready.png"));
+          await a.locator("#record-start").click();
           await a.waitForFunction(() =>
             document
               .querySelector("#recording-status")
@@ -938,9 +957,10 @@ async function main() {
           if (kind === "audio") await screenshot(a, "audio-preview");
           if (kind === "video") {
             await a.waitForFunction(() => document.querySelector("#clip-player video")?.dataset.preview === "ready");
-            assert.equal(await a.locator("#clip-player video").evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("blob:")), true);
+            assert.equal(await a.locator("#clip-player video").evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("data:image/jpeg")), true);
+            assert.equal(await a.locator("#clip-player .video-cover").isVisible(), true);
             await screenshot(a, "video-preview");
-            await fs.copyFile(path.join(root,"test-results/screenshots/iteration-08-video-preview.png"),path.join(root,"test-results/screenshots/iteration-15-create-video.png"));
+            await fs.copyFile(path.join(root,"test-results/screenshots/iteration-08-video-preview.png"),path.join(root,"test-results/screenshots/iteration-16-create-video.png"));
           }
           if (shared) await a.locator("#visibility-public").check();
           await emit(a);
@@ -961,9 +981,13 @@ async function main() {
           await player.waitFor({ state: "attached" });
           if (kind === "video") {
             await a.waitForFunction(() => document.querySelector("#detail-dialog video")?.dataset.preview === "ready");
-            assert.equal(await player.evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("blob:")), true);
+            assert.equal(await player.evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("data:image/jpeg")), true);
+            await player.evaluate(p=>p.removeAttribute("poster"));
+            await a.waitForFunction(()=>document.querySelector("#detail-dialog .video-cover img")?.naturalWidth > 0);
+            assert.equal(await a.locator("#detail-dialog .video-cover").isVisible(), true);
           }
-          await player.evaluate((p) => p.play());
+          if (kind === "video") await a.locator("#detail-dialog .video-cover").click();
+          else await player.evaluate((p) => p.play());
           await a.waitForTimeout(350);
           const before = await player.evaluate((p) => p.currentTime);
           assert.ok(before > 0);
@@ -1006,7 +1030,7 @@ async function main() {
             await a.screenshot({
               path: path.join(
                 root,
-                "test-results/screenshots/iteration-15-view-video.png",
+                "test-results/screenshots/iteration-16-view-video.png",
               ),
             });
           }

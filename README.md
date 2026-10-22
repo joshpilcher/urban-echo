@@ -125,3 +125,11 @@ Public Echoes now support one like per anonymous browser identity and short repl
 The bottom Journal link is now Activity. It lists recent likes and replies received by the current anonymous owner on public Echoes, and tapping an item opens that Echo. Activity excludes the owner’s own interactions. Clearing site data loses the anonymous identity and ownership of that browser session.
 
 The database uses separate `urban_echo_likes` and `urban_echo_replies` tables with cascade cleanup when an Echo is deleted. Public reads are available to discovery visitors; inserts/deletes are restricted by RLS to the current anonymous user, and replies/likes cannot be added to the creator’s own Echo. The interaction tests cover duplicate-like idempotency, draft recovery after a failed reply, literal text rendering, activity ownership, forged author/delete attempts, GPS relocking, deletion cascades and narrow/landscape layouts.
+
+## Recording readiness and iOS video covers (v0.6.1)
+
+Record video/audio now requests device access and opens a Ready screen. Video shows a live camera preview; audio confirms microphone readiness. Start recording begins MediaRecorder and the duration timer. Cancel or closing the form releases devices without attaching a clip.
+
+Following an iPhone report of a blank native poster, video previews now use an explicit image cover and play button above the native video. The still is a JPEG data URL, avoiding reliance on native poster rendering. The muted, inline decoder is attached to the document and briefly primed with play() so Safari can decode a frame; it never plays audible sound. A rejected decode leaves a clearly labelled Play fallback. Clicking the cover calls the visible player directly in the user gesture.
+
+Automated checks now remove the native poster and verify that the cover still renders, and exercise Ready/cancel/Start for both media types. This is a targeted compatibility change, not a confirmed physical-iPhone fix. Versioned asset URLs prevent older recorder/preview code from being reused by browser caches.

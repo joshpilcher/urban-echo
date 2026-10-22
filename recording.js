@@ -1,4 +1,4 @@
-/* Capture starts only after an explicit tap. All tracks stop on every exit path. */
+/* Device preview and recording are separate explicit steps. Tracks stop on every exit. */
 (() => {
   "use strict";
   window.EchoRecorder = {
@@ -36,7 +36,7 @@
         s.recorder.stop();
         release(s);
       }
-      async function start(kind) {
+      async function prepare(kind) {
         if (state !== "idle") return;
         if (!window.EchoRecorder.supported) {
           onError(
@@ -135,7 +135,13 @@
           };
           stream
             .getTracks()
-            .forEach((t) => t.addEventListener("ended", stop, { once: true }));
+            .forEach((t) => t.addEventListener("ended", () => {
+              if (session !== s || s.cancelled) return;
+              if (state === "ready") { cancel(); onError(new Error("Device preview ended. Open the recorder again.")); }
+              else stop();
+            }, { once: true }));
+          s.begin = () => {
+          s.started = performance.now();
           recorder.start(250);
           s.timer = setInterval(() => {
             const seconds = Math.floor((performance.now() - s.started) / 1000);
@@ -146,6 +152,8 @@
             }
           }, 250);
           setState("recording", { kind, stream, seconds: 0, limit: s.limit });
+          };
+          setState("ready", { kind, stream, seconds: 0, limit: s.limit });
         } catch (error) {
           stream?.getTracks().forEach((t) => t.stop());
           if (id !== token) return;
@@ -163,7 +171,13 @@
           );
         }
       }
+      function start() {
+        if (state !== "ready" || !session) return;
+        try { session.begin(); }
+        catch { cancel(); onError(new Error("Recording could not start. Open the recorder and try again.")); }
+      }
       return {
+        prepare,
         start,
         stop,
         cancel,

@@ -84,15 +84,17 @@ function setup({ pending = false, denied = false, supported = true } = {}) {
     resolve: () => resolvePermission(stream),
     tick: (seconds) => {
       now = seconds * 1000;
-      interval();
+      interval?.();
     },
     request: () => request,
   };
 }
 test("stop produces media and releases every device track", async () => {
   const x = setup();
-  await x.recorder.start("audio");
-  x.tick(2);
+  await x.recorder.prepare("audio");
+  x.tick(10); // Time spent framing the shot must not count toward the clip.
+  x.recorder.start();
+  x.tick(12);
   x.recorder.stop();
   assert.equal(x.ready[0][1], "audio");
   assert.equal(x.ready[0][2], 2);
@@ -101,7 +103,7 @@ test("stop produces media and releases every device track", async () => {
 });
 test("cancel pending permission releases a late stream and never records", async () => {
   const x = setup({ pending: true });
-  const p = x.recorder.start("video");
+  const p = x.recorder.prepare("video");
   x.recorder.cancel();
   x.resolve();
   await p;
@@ -112,7 +114,7 @@ test("cancel pending permission releases a late stream and never records", async
 test("permission denial and missing support provide file fallback", async () => {
   for (const options of [{ denied: true }, { supported: false }]) {
     const x = setup(options);
-    await x.recorder.start("audio");
+    await x.recorder.prepare("audio");
     assert.equal(x.errors.length, 1);
     assert.match(x.errors[0], /file/);
     assert.equal(x.recorder.busy, false);
@@ -124,7 +126,8 @@ test("video and audio automatically stop at their respective time limits", async
     ["audio", 60],
   ]) {
     const x = setup();
-    await x.recorder.start(kind);
+    await x.recorder.prepare(kind);
+    x.recorder.start();
     x.tick(limit);
     assert.equal(x.ready[0][2], limit);
     assert.ok(x.tracks.every((t) => t.stopped));
@@ -133,7 +136,8 @@ test("video and audio automatically stop at their respective time limits", async
 test("oversized and interrupted recordings are discarded with devices released", async () => {
   for (const failure of ["size", "error"]) {
     const x = setup();
-    await x.recorder.start("audio");
+    await x.recorder.prepare("audio");
+    x.recorder.start();
     if (failure === "size")
       x.request().ondataavailable({
         data: new Blob([new Uint8Array(8 * 1024 * 1024 + 1)]),
@@ -146,9 +150,25 @@ test("oversized and interrupted recordings are discarded with devices released",
 });
 test("cancel active recording discards chunks and does not replace attachment", async () => {
   const x = setup();
-  await x.recorder.start("video");
+  await x.recorder.prepare("video");
+  x.recorder.start();
   x.recorder.cancel();
   assert.equal(x.ready.length, 0);
   assert.equal(x.recorder.busy, false);
   assert.ok(x.tracks.every((t) => t.stopped));
+});
+
+test("ready devices wait for a separate Start and can cancel without a clip", async () => {
+  for (const kind of ["audio", "video"]) {
+    const x = setup();
+    await x.recorder.prepare(kind);
+    assert.equal(x.request().state, "inactive");
+    assert.equal(x.events.at(-1)[0], "ready");
+    assert.equal(x.ready.length, 0);
+    x.recorder.stop();
+    assert.equal(x.request().state, "inactive");
+    x.recorder.cancel();
+    assert.ok(x.tracks.every(t=>t.stopped));
+    assert.equal(x.ready.length, 0);
+  }
 });

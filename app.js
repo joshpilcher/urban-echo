@@ -347,7 +347,6 @@
             "This attachment could not load. Check your connection or try another browser.";
         });
         player.src = url;
-        if (a.kind === "video") window.EchoVideo?.preview(player);
         if (a.kind === "audio" && window.EchoAudio)
           area.append(
             window.EchoAudio.create(
@@ -358,6 +357,7 @@
             feedback,
           );
         else area.append(player, feedback);
+        if (a.kind === "video") window.EchoVideo?.preview(player);
       } else if (!url && !area.firstChild)
         area.append(node("p", "muted", "Loading attachment…"));
       if (!url && e.source !== "shared" && photos.get(photoKey(e, a))?.ready)
@@ -907,7 +907,6 @@
         player.setAttribute("playsinline", "");
         player.setAttribute("aria-label", "Selected " + kind + " preview");
       }
-      if (kind === "video") window.EchoVideo?.preview(player);
       const remove = node(
         "button",
         "text-button",
@@ -940,6 +939,7 @@
         area.append(heading, window.EchoAudio.create(player, "audio preview " + totals.audio, feedback), feedback, remove);
       } else area.append(player, remove);
       $(kind === "photo" ? "photo-items" : "clip-player").append(area);
+      if (kind === "video") window.EchoVideo?.preview(player);
     }
     $("photo-preview").hidden = !totals.photo;
     $("clip-preview").hidden = !totals.audio && !totals.video;
@@ -1044,19 +1044,21 @@
       const changed = recorderState !== state;
       recorderState = state;
       $("recorder").hidden = state === "idle";
-      if (changed && state === "recording")
+      $("recorder").dataset.state = state;
+      if (changed && (state === "ready" || state === "recording"))
         requestAnimationFrame(() => {
-          if ($("dialog").open && recorderState === "recording") {
-            $("record-stop").focus({ preventScroll: true });
+          if ($("dialog").open && recorderState === state) {
+            $(state === "ready" ? "record-start" : "record-stop").focus({ preventScroll: true });
             $("recorder").scrollIntoView({
               block: "nearest",
               behavior: "instant",
             });
           }
         });
+      $("record-start").hidden = state !== "ready";
       $("record-stop").hidden = state !== "recording";
       const live = $("recording-live");
-      live.hidden = state !== "recording" || data.kind !== "video";
+      live.hidden = !["ready", "recording"].includes(state) || data.kind !== "video";
       if (data.stream && live.srcObject !== data.stream) {
         live.srcObject = data.stream;
         live.play().catch(() => {});
@@ -1068,6 +1070,8 @@
       $("recording-status").textContent =
         state === "requesting"
           ? "Waiting for camera or microphone permission…"
+          : state === "ready"
+            ? (data.kind === "video" ? "Camera ready. Frame your shot, then tap Start recording." : "Microphone ready. Tap Start recording when you’re ready.")
           : state === "processing"
             ? "Finishing your recording…"
             : "Recording " +
@@ -1089,13 +1093,14 @@
     $("record-" + kind).addEventListener("click", () => {
       pausePlayers($("clip-player"));
       $("clip-status").textContent = "";
-      recorder.start(kind);
+      recorder.prepare(kind);
     });
     $(kind + "-file").addEventListener("change", async () => {
       const files = [...($(kind + "-file").files || [])];
       for (const file of files) await attachClip(file, kind);
     });
   }
+  $("record-start").addEventListener("click", recorder.start);
   $("record-stop").addEventListener("click", recorder.stop);
   $("record-cancel").addEventListener("click", recorder.cancel);
   $("dialog").addEventListener("close", () => {

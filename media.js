@@ -108,63 +108,60 @@
     }
   }
   async function prepareClip(file, expectedKind, recordedDuration) {
-    const info = window.EchoCore.mediaInfo(file?.type);
-    if (!info || info.kind !== expectedKind)
-      throw new Error(
-        "Choose a supported " +
-          expectedKind +
-          " file. Try MP4 or WebM for video; M4A, MP3, WAV, Ogg or WebM for audio.",
-      );
+    const info = window.EchoCore.importMediaInfo(file?.type, file?.name, expectedKind);
+    if (!info)
+      throw new Error("Choose a supported " + expectedKind + " file. Try MP4, MOV or WebM for video; M4A, MP3, WAV, Ogg or WebM for audio.");
     if (!file.size || file.size > info.maxBytes)
-      throw new Error(
-        "Choose " +
-          expectedKind +
-          " smaller than " +
-          info.maxBytes / 1024 / 1024 +
-          " MB.",
-      );
-    const url = URL.createObjectURL(file);
+      throw new Error("This " + expectedKind + " is " + (file.size / 1024 / 1024).toFixed(1) + " MB. Choose a file up to " + info.maxBytes / 1024 / 1024 + " MB.");
+    // File pickers may omit a type or supply a platform alias. Use a normalised
+    // Blob for metadata/loading, then let the browser verify the actual content.
+    const blob = file.slice(0, file.size, info.type);
+    const url = URL.createObjectURL(blob);
     const player = document.createElement(expectedKind);
-    player.preload = "metadata";
+    player.preload = "auto";
+    player.muted = player.defaultMuted = true;
+    player.playsInline = true;
+    player.setAttribute("playsinline", "");
+    player.setAttribute("aria-hidden", "true");
+    player.tabIndex = -1;
+    player.style.cssText = "position:fixed;left:-2px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+    document.body.append(player);
+    let timer, poll, duration;
     try {
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () =>
-            reject(
-              new Error("This file could not be opened. Try another format."),
-            ),
-          12000,
-        );
+      duration = await new Promise((resolve, reject) => {
+        let metadata = false, scanning = false;
+        const check = () => {
+          const length = recordedDuration ?? player.duration;
+          if (metadata && Number.isFinite(length) && length > 0) resolve(length);
+        };
+        timer = setTimeout(() => reject(new Error("The duration of this file could not be read. Try a short MP4 export, then choose it again.")), 15000);
+        poll = setInterval(check, 150);
         player.onloadedmetadata = () => {
-          clearTimeout(timer);
-          resolve();
+          metadata = true;
+          check();
+          // Some imported WebM clips have no duration header. Scanning to the
+          // end lets the browser report the real duration; it is still validated.
+          if (!recordedDuration && !Number.isFinite(player.duration) && info.type.endsWith("webm") && !scanning) {
+            scanning = true;
+            try { player.currentTime = 1e9; } catch { /* Wait for durationchange. */ }
+          }
         };
-        player.onerror = () => {
-          clearTimeout(timer);
-          reject(
-            new Error(
-              "This browser cannot play this file. Try another format.",
-            ),
-          );
-        };
+        player.ondurationchange = player.onloadeddata = player.onseeked = check;
+        player.onerror = () => reject(new Error("This browser cannot open this video/audio format. Try exporting a short MP4 video or M4A audio file."));
         player.src = url;
+        player.load();
       });
-      // Recorded WebM can report Infinity until fully scanned. Our recorder supplies elapsed time.
-      const duration = recordedDuration ?? player.duration;
-      if (
-        !Number.isFinite(duration) ||
-        duration <= 0 ||
-        duration > info.maxSeconds + 0.5
-      )
-        throw new Error(
-          "Choose a clip up to " +
-            info.maxSeconds +
-            " seconds with a readable duration.",
-        );
-      return file.slice(0, file.size, info.type);
+      if (duration > info.maxSeconds + 0.5)
+        throw new Error("This " + expectedKind + " is " + Math.ceil(duration) + " seconds long. Choose a clip up to " + info.maxSeconds + " seconds.");
+      return blob;
     } finally {
+      clearTimeout(timer);
+      clearInterval(poll);
+      player.onloadedmetadata = player.ondurationchange = player.onloadeddata = player.onseeked = player.onerror = null;
+      player.pause();
       player.removeAttribute("src");
       player.load();
+      player.remove();
       URL.revokeObjectURL(url);
     }
   }

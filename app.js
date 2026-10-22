@@ -1017,7 +1017,7 @@
   async function attachClip(file, kind, duration) {
     const token = ++clipGeneration;
     preparingClip = true;
-    $("clip-status").textContent = "Preparing your " + kind + "…";
+    $("clip-status").textContent = "Checking " + (file.name || "your " + kind) + "…";
     updateForm();
     try {
       const blob = await Media.prepareClip(file, kind, duration);
@@ -1026,10 +1026,12 @@
       $("clip-status").textContent =
         (kind === "audio" ? "Audio" : "Video") +
         " added. Preview before saving.";
+      if ($("dialog").open) $("clip-preview").scrollIntoView({block:"nearest"});
     } catch (error) {
       if (token === clipGeneration)
         $("clip-status").textContent =
           error.message + " Your selected attachments are still here.";
+      if (token === clipGeneration && $("dialog").open) $("clip-status").scrollIntoView({block:"nearest"});
     } finally {
       if (token === clipGeneration) {
         preparingClip = false;

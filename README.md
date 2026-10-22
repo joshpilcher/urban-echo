@@ -133,3 +133,11 @@ Record video/audio now requests device access and opens a Ready screen. Video sh
 Following an iPhone report of a blank native poster, video previews now use an explicit image cover and play button above the native video. The still is a JPEG data URL, avoiding reliance on native poster rendering. The muted, inline decoder is attached to the document and briefly primed with play() so Safari can decode a frame; it never plays audible sound. A rejected decode leaves a clearly labelled Play fallback. Clicking the cover calls the visible player directly in the user gesture.
 
 Automated checks now remove the native poster and verify that the cover still renders, and exercise Ready/cancel/Start for both media types. This is a targeted compatibility change, not a confirmed physical-iPhone fix. Versioned asset URLs prevent older recorder/preview code from being reused by browser caches.
+
+## Existing video file imports (v0.6.2)
+
+The existing-file picker supports MP4, MOV, M4V and WebM video within the existing 30-second / 20 MiB limits. Missing/generic picker MIME types can be inferred from supported extensions; common picker aliases are normalised. Extension inference does not bypass actual browser metadata decoding or duration/size validation. Imported blobs use the canonical MIME type before preview/storage.
+
+The metadata reader is now attached, muted and inline, waits for a finite duration across metadata/duration events, and cleans up on success, failure or timeout. Imported WebM files without a duration header can be scanned before validation. Limits appear beside the chooser, rejection messages show the file size or duration, and the status/preview is brought into view.
+
+Tests include checked-in generated H.264 MP4 and QuickTime MOV fixtures, import/preview/play/removal with normal, missing and generic MIME types, plus delayed metadata and malformed-file rejection. These do not identify the exact cause for the reported phone clip without that file or its error message.

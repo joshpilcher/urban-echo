@@ -144,3 +144,14 @@ test("mixed galleries and legacy attachments normalise without losing types or o
     false,
   );
 });
+
+test("file imports accept missing types and picker aliases without accepting wrong media", () => {
+  assert.equal(Core.importMediaInfo("", "IMG_1234.MOV", "video").type, "video/quicktime");
+  assert.equal(Core.importMediaInfo("application/octet-stream", "clip.mp4", "video").type, "video/mp4");
+  assert.equal(Core.importMediaInfo("video/x-m4v", "clip.m4v", "video").type, "video/mp4");
+  assert.equal(Core.importMediaInfo("", "clip.webm", "video").type, "video/webm");
+  assert.equal(Core.importMediaInfo("", "voice.m4a", "audio").type, "audio/mp4");
+  assert.equal(Core.importMediaInfo("text/html", "clip.mp4", "video"), null);
+  assert.equal(Core.importMediaInfo("audio/mp4", "voice.mp4", "video"), null);
+  assert.equal(Core.importMediaInfo("", "unknown.bin", "video"), null);
+});

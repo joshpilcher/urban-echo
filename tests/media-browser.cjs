@@ -333,6 +333,47 @@ async function main() {
           await a.locator("#close").click();
         },
       );
+    if (!shared) await check("existing MP4 and MOV imports work with normal, missing and generic file types", async () => {
+      await open(a);
+      await a.locator("#title").fill("Imported video test");
+      for (const [name,type] of [["import-video.mp4","video/mp4"],["import-video.mov","video/quicktime"],["import-video.mp4",""],["import-video.mp4","application/octet-stream"]]) {
+        const bytes=await fs.readFile(path.join(root,"tests/fixtures",name));
+        await a.evaluate(({bytes,name,type})=>{
+          const file=new File([new Uint8Array(bytes)],name,{type});
+          const transfer=new DataTransfer();transfer.items.add(file);
+          const input=document.querySelector("#video-file");input.files=transfer.files;
+          input.dispatchEvent(new Event("change",{bubbles:true}));
+        },{bytes:[...bytes],name,type});
+        await a.waitForFunction(()=>!document.querySelector("#save-echo").disabled);
+        assert.equal(await a.locator("#clip-player video").count(),1,await a.locator("#clip-status").textContent());
+        await a.waitForFunction(()=>document.querySelector("#clip-player video")?.dataset.preview==="ready");
+        await a.locator("#clip-player .video-cover").click();
+        await a.waitForFunction(()=>!document.querySelector("#clip-player video").paused);
+        await a.locator("#clip-remove").click();
+        assert.equal(await a.locator("#clip-player video").count(),0);
+      }
+      assert.equal(await a.locator("#title").inputValue(),"Imported video test");
+      await a.locator("#close").click();
+    });
+    if (shared) await check("an imported MP4 shares and plays in another session", async () => {
+      const title=prefix+" imported MP4";
+      await open(a);
+      await a.locator("#title").fill(title);
+      await a.locator("#story").fill("Generated video file for import testing; not camera footage.");
+      await a.locator("#video-file").setInputFiles(path.join(root,"tests/fixtures/import-video.mp4"));
+      await a.waitForFunction(()=>!document.querySelector("#save-echo").disabled);
+      assert.equal(await a.locator("#clip-player video").count(),1,await a.locator("#clip-status").textContent());
+      await a.locator("#visibility-public").check();await emit(a);await a.locator("#save-echo").click();
+      await a.locator("#dialog").waitFor({state:"hidden"});
+      await b.locator("#nav-map").click();await b.locator("#refresh-shared").click();await emit(b);
+      await b.locator("#nav-nearby").click();await b.locator(".echo").filter({hasText:title}).click();
+      await b.waitForFunction(()=>document.querySelector("#detail-dialog video")?.dataset.preview==="ready");
+      await b.locator("#detail-dialog .video-cover").click();
+      await b.waitForFunction(()=>!document.querySelector("#detail-dialog video").paused);
+      await b.locator("#detail-close").click();await b.locator("#nav-map").click();
+      await a.evaluate(async title=>{const row=(await EchoCloud.load()).find(e=>e.title===title);await EchoCloud.remove(row);},title);
+      await a.locator("#refresh-shared").click();
+    });
     const galleryTitle = shared
       ? prefix + " mixed gallery"
       : "A moment by the water";

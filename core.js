@@ -31,6 +31,19 @@
         }
       : null;
   }
+  function importMediaInfo(mime = "", filename = "", expectedKind) {
+    const type = mime.split(";")[0].trim().toLowerCase();
+    const aliases = {"video/x-m4v":"video/mp4", "video/mov":"video/quicktime", "video/x-quicktime":"video/quicktime", "audio/x-mp3":"audio/mpeg"};
+    let info = mediaInfo(aliases[type] || type);
+    if (!info && ["", "application/octet-stream", "binary/octet-stream", "application/mp4"].includes(type)) {
+      const ext = filename.toLowerCase().split(".").pop();
+      const types = expectedKind === "video"
+        ? {mp4:"video/mp4", m4v:"video/mp4", mov:"video/quicktime", webm:"video/webm"}
+        : {m4a:"audio/mp4", mp4:"audio/mp4", mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", webm:"audio/webm"};
+      info = mediaInfo(types[ext]);
+    }
+    return info?.kind === expectedKind ? info : null;
+  }
   const MAX_ATTACHMENTS = 8;
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   function attachments(e) {
@@ -148,6 +161,7 @@
     MAX_TOTAL_BYTES,
     attachments,
     mediaInfo,
+    importMediaInfo,
     RADIUS,
     MAX_FIX_AGE,
     validCoordinates,

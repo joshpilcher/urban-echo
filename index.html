@@ -18,7 +18,7 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
-    <link rel="stylesheet" href="styles.css?v=0.6.1" />
+    <link rel="stylesheet" href="styles.css?v=0.6.2" />
   </head>
   <body>
     <svg
@@ -89,7 +89,7 @@
           <p>Places hold stories.</p>
         </div>
         <div class="header-actions">
-          <span class="version">WORKING PROTOTYPE · 0.6.1</span
+          <span class="version">WORKING PROTOTYPE · 0.6.2</span
           ><button
             class="icon-button"
             id="search-toggle"
@@ -343,13 +343,14 @@
         </p>
         <details class="clip-import">
           <summary>Choose an existing video or audio file</summary>
+          <p class="muted">Video: MP4, MOV or WebM, up to 30 seconds and 20 MB. Trim longer clips before choosing them.</p>
           <div class="clip-files">
             <label for="video-file">Choose video file</label
             ><input
               id="video-file"
               multiple
               type="file"
-              accept="video/mp4,video/webm,video/quicktime"
+              accept="video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.mov,.m4v,.webm"
             />
             <label for="audio-file">Choose audio file</label
             ><input
@@ -360,6 +361,7 @@
             />
           </div>
         </details>
+        <p id="clip-status" class="muted" role="status" aria-live="polite"></p>
         <section
           id="recorder"
           class="recorder"
@@ -385,7 +387,6 @@
         >
           <div id="clip-player"></div>
         </section>
-        <p id="clip-status" class="muted" role="status"></p>
         <p class="media-note">
           Record video or audio opens a device preview. Tap Start recording when ready. Preview
           before saving. Add spoken words as text in your story so others can
@@ -501,13 +502,13 @@
     ></script>
     <script src="vendor/supabase/supabase.js"></script>
     <script src="config.js"></script>
-    <script src="core.js"></script>
-    <script src="media.js"></script>
-    <script src="recording.js?v=0.6.1"></script>
+    <script src="core.js?v=0.6.2"></script>
+    <script src="media.js?v=0.6.2"></script>
+    <script src="recording.js?v=0.6.2"></script>
     <script src="cloud.js"></script>
     <script src="audio-player.js"></script>
     <script src="social.js"></script>
-    <script src="video-preview.js?v=0.6.1"></script>
-    <script src="app.js?v=0.6.1"></script>
+    <script src="video-preview.js?v=0.6.2"></script>
+    <script src="app.js?v=0.6.2"></script>
   </body>
 </html>

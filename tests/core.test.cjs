@@ -155,3 +155,19 @@ test("file imports accept missing types and picker aliases without accepting wro
   assert.equal(Core.importMediaInfo("audio/mp4", "voice.mp4", "video"), null);
   assert.equal(Core.importMediaInfo("", "unknown.bin", "video"), null);
 });
+
+test("marker emphasis increases on approach while content keeps its unlock boundary", () => {
+  const readings = [600,400,250,120,50].map(m=>Core.discovery(origin,{...fix,...north(m)},now));
+  assert.equal(readings[0].proximity,0);
+  for(let i=1;i<readings.length;i++) assert.ok(readings[i].proximity>readings[i-1].proximity);
+  assert.equal(readings.at(-1).proximity,1);
+  assert.ok(readings.slice(0,-1).every(r=>r.state==='locked'));
+  assert.equal(readings.at(-1).state,'unlocked');
+});
+test("uncertainty and stale GPS do not show full marker confidence", () => {
+  const uncertain=Core.discovery(origin,{...fix,...north(95),accuracy:15},now);
+  assert.equal(uncertain.state,'uncertain');assert.ok(uncertain.proximity<1);
+  assert.ok(Core.discovery(origin,{...fix,accuracy:300},now).proximity<Core.discovery(origin,fix,now).proximity);
+  assert.equal(Core.discovery(origin,null,now).proximity,0);
+  assert.equal(Core.discovery(origin,{...fix,timestamp:now-30000},now).proximity,0);
+});

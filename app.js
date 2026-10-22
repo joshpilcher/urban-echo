@@ -230,38 +230,39 @@
         pins.delete(id);
       }
     records.forEach((e) => {
-      const content = node(
-        "span",
-        "echo-marker " + (e.state === "unlocked" ? "is-unlocked" : "is-locked"),
-      );
-      const url =
-        e.state === "unlocked" ? (hasPhoto(e) ? attachmentURL(e) : null) : null;
-      if (url) {
-        const image = node("img");
-        image.src = url;
-        image.alt = "";
-        content.append(image);
-      } else
-        content.append(
-          icon(mediaKind(e) === "photo" ? "camera" : mediaKind(e)),
-        );
-      const markerIcon = L.divIcon({
-        className: "",
-        html: content,
-        iconSize: [38, 38],
-        iconAnchor: [19, 38],
-      });
       let pin = pins.get(e.id);
-      if (!pin) {
-        pin = L.marker([e.lat, e.lng], {
-          icon: markerIcon,
-          alt: e.title,
-        }).addTo(map);
-        pin.on("click", () => openDetail(e.id));
-        pins.set(e.id, pin);
-      } else pin.setIcon(markerIcon);
+      let content = pin?.getElement()?.querySelector(".echo-marker");
+      if (!content) {
+        content = node("span", "echo-marker");
+        const markerIcon = L.divIcon({className:"", html:content, iconSize:[44,44], iconAnchor:[22,41]});
+        if (!pin) {
+          pin = L.marker([e.lat,e.lng], {icon:markerIcon}).addTo(map);
+          pin.on("click",()=>openDetail(e.id));
+          pins.set(e.id,pin);
+        } else pin.setIcon(markerIcon);
+      }
+      const presence = e.proximity || 0;
+      content.className = "echo-marker is-" + e.state;
+      content.dataset.proximity = presence.toFixed(3);
+      content.style.setProperty("--echo-presence", presence.toFixed(3));
+      content.style.setProperty("--echo-scale", (0.72 + presence * 0.38).toFixed(3));
+      content.style.setProperty("--echo-opacity", (0.55 + presence * 0.45).toFixed(3));
+      const url = e.state === "unlocked" && hasPhoto(e) ? attachmentURL(e) : null;
+      const key = url || mediaKind(e);
+      if (content.dataset.mediaKey !== key) {
+        content.replaceChildren();
+        if (url) {
+          const image = node("img");image.src=url;image.alt="";content.append(image);
+        } else content.append(icon(mediaKind(e) === "photo" ? "camera" : mediaKind(e)));
+        content.dataset.mediaKey = key;
+      }
+      const label = e.title + ". " + stateLabel(e).toLowerCase().replaceAll("_"," ") +
+        (e.distance === null ? "." : ". " + distanceLabel(e.distance) + " away.");
+      pin.getElement()?.setAttribute("aria-label",label);
+      pin.setZIndexOffset(Math.round(presence*200)+(e.state === "unlocked" ? 100 : 0));
     });
   }
+
   function drawDetail() {
     if (!$("detail-dialog").open) return;
     const e = allRecords().find((e) => e.id === selectedId);
@@ -540,8 +541,8 @@
         : !Core.canCreate(fix)
           ? "Wait for a clearer GPS reading to reveal memories."
           : unlocked.length
-            ? "Tap to explore the memories around you."
-            : "Leave a memory here, or open Nearby to explore.";
+            ? "Bright teal pins are within reach. Tap to explore."
+            : "Pins grow brighter as you get closer. Open Nearby to explore.";
 
     const query = $("search").value.trim().toLocaleLowerCase();
     const filtered = records.filter(

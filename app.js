@@ -316,6 +316,7 @@
     function updateMedia(area, a, index) {
       const url = attachmentURL(e, a);
       if (url && area.dataset.url !== url) {
+        disposeAudioPlayers(area);
         pausePlayers(area);
         area.replaceChildren();
         area.dataset.url = url;
@@ -346,6 +347,7 @@
             "This attachment could not load. Check your connection or try another browser.";
         });
         player.src = url;
+        if (a.kind === "video") window.EchoVideo?.preview(player);
         if (a.kind === "audio" && window.EchoAudio)
           area.append(
             window.EchoAudio.create(
@@ -874,6 +876,7 @@
     updateForm();
   }
   function disposeAudioPlayers(area) {
+    area.querySelectorAll("video").forEach(player => player.disposePreview?.());
     area
       .querySelectorAll(".echo-audio")
       .forEach((widget) => widget.dispose?.());
@@ -904,6 +907,7 @@
         player.setAttribute("playsinline", "");
         player.setAttribute("aria-label", "Selected " + kind + " preview");
       }
+      if (kind === "video") window.EchoVideo?.preview(player);
       const remove = node(
         "button",
         "text-button",

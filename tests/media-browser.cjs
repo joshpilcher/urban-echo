@@ -815,6 +815,7 @@ async function main() {
           await b.locator(".echo").filter({ hasText: galleryTitle }).click();
           await b.locator("#detail-image img").waitFor();
           await b.locator("#detail-dialog audio").evaluate((p) => p.play());
+          await b.waitForFunction(() => document.querySelector("#detail-image video")?.dataset.preview === "ready");
           await b.locator("#detail-image video").evaluate((p) => p.play());
           assert.equal(await b.locator("#delete-echo").isVisible(), false);
           const result = await b.evaluate(async (row) => {
@@ -935,6 +936,12 @@ async function main() {
             true,
           );
           if (kind === "audio") await screenshot(a, "audio-preview");
+          if (kind === "video") {
+            await a.waitForFunction(() => document.querySelector("#clip-player video")?.dataset.preview === "ready");
+            assert.equal(await a.locator("#clip-player video").evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("blob:")), true);
+            await screenshot(a, "video-preview");
+            await fs.copyFile(path.join(root,"test-results/screenshots/iteration-08-video-preview.png"),path.join(root,"test-results/screenshots/iteration-15-create-video.png"));
+          }
           if (shared) await a.locator("#visibility-public").check();
           await emit(a);
           await a.locator("#save-echo").click();
@@ -952,6 +959,10 @@ async function main() {
           await a.locator(".echo").filter({ hasText: title }).click();
           const player = a.locator("#detail-dialog " + kind);
           await player.waitFor({ state: "attached" });
+          if (kind === "video") {
+            await a.waitForFunction(() => document.querySelector("#detail-dialog video")?.dataset.preview === "ready");
+            assert.equal(await player.evaluate(p => p.paused && p.currentTime === 0 && p.poster.startsWith("blob:")), true);
+          }
           await player.evaluate((p) => p.play());
           await a.waitForTimeout(350);
           const before = await player.evaluate((p) => p.currentTime);
@@ -984,6 +995,7 @@ async function main() {
             .locator("#detail-dialog " + kind)
             .waitFor({ state: "attached" });
           if (kind === "video") {
+            await a.waitForFunction(() => document.querySelector("#detail-dialog video")?.dataset.preview === "ready");
             await a.evaluate(() => {
               const x = document.createElement("p");
               x.textContent = "SYNTHETIC VIDEO · SIMULATED GPS";
@@ -994,7 +1006,7 @@ async function main() {
             await a.screenshot({
               path: path.join(
                 root,
-                "test-results/screenshots/iteration-08-video-detail.png",
+                "test-results/screenshots/iteration-15-view-video.png",
               ),
             });
           }
